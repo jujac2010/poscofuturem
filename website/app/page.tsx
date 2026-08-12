@@ -52,17 +52,24 @@ export default function Home() {
   const [lastEvent, setLastEvent] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
   const [simulationTime, setSimulationTime] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [aiMessage, setAiMessage] = useState("Twin AI가 5대 장비의 상태를 분석 중입니다");
   const selected = forklifts.find((forklift) => forklift.id === selectedId) ?? forklifts[0];
 
   useEffect(() => {
     if (paused) return;
     const timer = window.setInterval(() => {
       setSimulationTime((current) => (current + 0.018 * speed) % 1);
+      setElapsedSeconds((current) => {
+        const next = current + 0.2 * speed;
+        if (next >= 24) triggerRandomIncident();
+        return next >= 24 ? 0 : next;
+      });
       setForklifts((current) => current.map((forklift) => {
         if (forklift.status === "점검") {
           return { ...forklift, battery: Math.max(18, forklift.battery - 0.04 * speed), temperature: Math.min(96, forklift.temperature + 0.09 * speed), vibration: Math.min(9.8, forklift.vibration + 0.04 * speed) };
         }
-        const drift = Math.sin(Date.now() / 3100 + forklift.id.charCodeAt(5)) * 0.22;
+        const drift = Math.sin(Date.now() / 3100 + forklift.id.charCodeAt(2)) * 0.22;
         return { ...forklift, battery: Math.max(20, forklift.battery - 0.008 * speed), temperature: Math.max(35, Math.min(78, forklift.temperature + drift * 0.06)), vibration: Math.max(0.8, Math.min(4.5, forklift.vibration + drift * 0.025)) };
       }));
     }, 200);
@@ -72,9 +79,21 @@ export default function Home() {
   const stats = useMemo(() => ({ normal: forklifts.filter((item) => item.status === "정상").length, warning: forklifts.filter((item) => item.status === "주의").length, check: forklifts.filter((item) => item.status === "점검").length }), [forklifts]);
 
   function triggerIncident() {
-    setForklifts((current) => current.map((forklift) => forklift.id === "P-03호" ? { ...forklift, status: "점검", temperature: Math.max(82, forklift.temperature + 22), vibration: Math.max(6.4, forklift.vibration + 3.5), risk: "높음", task: "긴급 점검 대기" } : forklift));
-    setSelectedId("P-03호");
-    setLastEvent("09:43:02 · P-03호 온도·진동 상승 감지 · 점검 필요");
+    triggerRandomIncident("P-03호");
+  }
+
+  function triggerRandomIncident(preferredId?: string) {
+    const targetId = preferredId ?? forklifts[Math.floor(Math.random() * forklifts.length)].id;
+    setForklifts((current) => current.map((forklift) => forklift.id === targetId ? { ...forklift, status: "점검", temperature: Math.max(82, forklift.temperature + 18 + Math.random() * 8), vibration: Math.max(6.2, forklift.vibration + 2.8 + Math.random() * 1.5), risk: "높음", task: "긴급 점검 대기" } : forklift));
+    setSelectedId(targetId);
+    setLastEvent(`09:43:02 · ${targetId} 이상 징후 랜덤 감지 · 점검 필요`);
+    setAiMessage(`Twin AI: ${targetId}의 온도·진동 패턴에서 이상 징후를 감지했습니다`);
+  }
+
+  function formatTimer(seconds: number) {
+    const minutes = Math.floor(seconds / 60).toString().padStart(2, "0");
+    const remainder = Math.floor(seconds % 60).toString().padStart(2, "0");
+    return `${minutes}:${remainder}`;
   }
 
   function positionFor(forklift: Forklift) {
@@ -96,12 +115,15 @@ export default function Home() {
 
       <section className="status-strip" aria-label="현장 요약"><div><span className="strip-label">운용 장비</span><strong>05 <small>대</small></strong></div><div><span className="strip-label">정상 운행</span><strong className="green">{stats.normal} <small>대</small></strong></div><div><span className="strip-label">주의 관찰</span><strong className="yellow">{stats.warning} <small>대</small></strong></div><div><span className="strip-label">점검 필요</span><strong className="red">{stats.check} <small>대</small></strong></div><div className="strip-note"><Icon>⌁</Icon> 마지막 데이터 수신 <b>2.4초 전</b></div></section>
 
-      <section className="control-bar"><div className="section-kicker"><span className="live-dot" /> 실시간 이동 시뮬레이션 <small className="motion-readout">경로 추적 중 · {paused ? "일시정지" : `${speed}배속`}</small></div><div className="control-actions"><span className="control-label">속도</span>{[1, 2, 4].map((value) => <button key={value} className={`speed-button ${speed === value ? "active" : ""}`} onClick={() => setSpeed(value)}>{value}배</button>)}<button className="incident-button" onClick={triggerIncident}><Icon>⚠</Icon> 이상상황 발생</button></div></section>
+      <section className="control-bar"><div className="section-kicker"><span className="live-dot" /> Twin AI · 실시간 이동 시뮬레이션 <small className="motion-readout">{paused ? "일시정지" : "경로 추적 중"} · {speed}배속</small></div><div className="control-actions"><span className="timer-display">{formatTimer(elapsedSeconds)}</span><button className="ghost-button timer-button" onClick={() => setPaused((value) => !value)}>{paused ? "▶ 재생" : "Ⅱ 일시정지"}</button><span className="control-label">속도</span>{[1, 2, 4].map((value) => <button key={value} className={`speed-button ${speed === value ? "active" : ""}`} onClick={() => setSpeed(value)}>{value}배</button>)}<button className="incident-button" onClick={() => triggerRandomIncident()}><Icon>⚠</Icon> 랜덤 이상상황</button></div></section>
 
       <section className="main-grid">
         <div className="map-card panel">
           <div className="panel-header"><div><span className="section-kicker">LIVE SITE MAP</span><h2>현장 배치도</h2></div><div className="legend"><span><i className="legend-dot green-bg" />정상</span><span><i className="legend-dot yellow-bg" />주의</span><span><i className="legend-dot red-bg" />점검</span></div></div>
-          <div className="map-canvas" aria-label="5대 지게차가 표시된 현장 배치도">
+          <div className="map-canvas three-d-twin" data-twin-ai="true" aria-label="Twin AI 3D 현장 배치도">
+            <div className="ai-overlay"><span className="ai-orb">✦</span><div><b>Twin AI</b><span>{aiMessage}</span></div></div>
+            <div className="twin-timer"><span>시뮬레이션 타이머</span><strong>{formatTimer(elapsedSeconds)}</strong><small>{paused ? "일시정지" : "재생 중"}</small></div>
+            <div className="twin-image" />
             <div className="map-grid-lines" /><div className="north">N</div><div className="zone zone-yard"><span>원료 야드</span><small>RAW MATERIAL YARD</small></div><div className="zone zone-storage"><span>저장동</span><small>STORAGE BUILDING</small></div><div className="zone zone-shipping"><span>출하장</span><small>SHIPPING DOCK</small></div><div className="zone zone-maintenance"><span>정비구역</span><small>MAINTENANCE</small></div><div className="zone zone-charge"><span>대기 충전</span><small>CHARGE BAY</small></div><div className="road road-one" /><div className="road road-two" />
             {forklifts.map((forklift) => <button key={forklift.id} data-moving="true" className={`forklift-marker status-${forklift.status}`} style={positionFor(forklift)} onClick={() => setSelectedId(forklift.id)} aria-label={`${forklift.id} 상세 보기`}><span className="motion-ring" /><span className="forklift-icon">▰</span><span className="marker-label">{forklift.id}</span><span className="tooltip"><b>{forklift.id}</b><span>{forklift.zone} · {forklift.status}</span><span>배터리 {Math.round(forklift.battery)}% · 모터 {Math.round(forklift.temperature)}°C</span><span className="tooltip-route">↗ {forklift.route}</span></span></button>)}
           </div>
