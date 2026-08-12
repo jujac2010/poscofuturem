@@ -44,6 +44,7 @@ const events = [
 
 const drivingRecords = [
   ["09:43:18", "P-01호", "원료 야드 → 저장동", "원료 이송", "정상", "128 m"],
+  ["09:43:06", "P-02호", "저장동 내부 순환", "양극재 적재", "정상", "96 m"],
   ["09:42:54", "P-03호", "출하장 대기선", "출하 대기", "정상", "64 m"],
   ["09:42:21", "P-05호", "대기 충전", "충전 완료", "정상", "12 m"],
   ["09:41:53", "P-04호", "정비구역", "점검 후 대기", "주의", "41 m"],
@@ -95,7 +96,10 @@ export default function Home() {
         const now = new Date();
         const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
         setLiveClock(time);
-        setLiveRecords((current) => [[time, source.id, `${source.zone} → 이동중`, source.task, source.status, `${Math.round(40 + source.battery * 1.1)} m`], ...current].slice(0, 8));
+        setLiveRecords((current) => current.map((record) => {
+          const liveForklift = forkliftsRef.current.find((forklift) => forklift.id === record[1]) ?? source;
+          return [time, liveForklift.id, `${liveForklift.zone} → 이동중`, liveForklift.task, liveForklift.status, `${Math.round(40 + liveForklift.battery * 1.1)} m`];
+        }));
         setLiveEvents((current) => [{ time, label: source.id, text: `${source.zone} 이동 · ${source.status} 상태`, tone: source.status === "점검" ? "critical" : source.status === "주의" ? "warning" : "normal" }, ...current].slice(0, 8));
       }
     }, 200);
@@ -162,7 +166,7 @@ export default function Home() {
 
       <section className="bottom-grid"><div className="fleet-card panel"><div className="panel-header"><div><span className="section-kicker">FLEET OVERVIEW</span><h2>전체 지게차 현황</h2></div><span className="panel-meta">5대 운용 중</span></div><div className="fleet-list">{forklifts.map((forklift) => <button key={forklift.id} className={`fleet-row ${selected.id === forklift.id ? "selected" : ""}`} onClick={() => setSelectedId(forklift.id)}><span className={`mini-vehicle status-${forklift.status}`}>▰</span><span className="fleet-id">{forklift.id}<small>{forklift.zone}</small></span><span className={`fleet-status status-${forklift.status}`}>{forklift.status}</span><span className="fleet-battery"><span className="battery-track"><i style={{ width: `${forklift.battery}%` }} /></span>{Math.round(forklift.battery)}%</span><span className="fleet-temp">{Math.round(forklift.temperature)}°C</span><span className="row-arrow">›</span></button>)}</div></div><div className="event-card panel"><div className="panel-header"><div><span className="section-kicker">EVENT LOG</span><h2>이벤트 로그</h2></div><span className="panel-meta"><span className="live-dot" /> LIVE</span></div><div className="event-list">{liveEvents.map((event, index) => <div className={`event-row ${event.tone === "critical" ? "event-critical" : ""}`} key={`${event.time}-${event.label}-${index}`}><span className="event-time">{event.time}</span><span className={`event-dot ${event.tone}`} /><span><b>{event.label}</b> {event.text}</span></div>)}</div></div></section>
 
-      <section className="records-card panel"><div className="panel-header"><div><span className="section-kicker">DRIVING RECORDS</span><h2>실시간 운행기록</h2></div><span className="panel-meta"><span className="live-dot" /> LIVE · {liveClock}</span></div><div className="record-table-wrap"><table className="record-table"><thead><tr><th>시각</th><th>장비</th><th>운행 구간</th><th>현재 작업</th><th>상태</th><th>주행거리</th></tr></thead><tbody>{liveRecords.map((record) => <tr key={`${record[0]}-${record[1]}-${record[5]}`}><td>{record[0]}</td><td><b>{record[1]}</b></td><td>{record[2]}</td><td>{record[3]}</td><td><span className={`record-status status-${record[4]}`}>{record[4]}</span></td><td>{record[5]}</td></tr>)}</tbody></table></div></section>
+      <section className="records-card panel"><div className="panel-header"><div><span className="section-kicker">DRIVING RECORDS</span><h2>실시간 운행기록</h2></div><span className="panel-meta"><span className="live-dot" /> LIVE · {liveClock}</span></div><div className="record-table-wrap"><table className="record-table"><thead><tr><th>시각</th><th>장비</th><th>운행 구간</th><th>현재 작업</th><th>상태</th><th>주행거리</th></tr></thead><tbody>{liveRecords.map((record) => <tr key={record[1]}><td>{record[0]}</td><td><b>{record[1]}</b></td><td>{record[2]}</td><td>{record[3]}</td><td><span className={`record-status status-${record[4]}`}>{record[4]}</span></td><td>{record[5]}</td></tr>)}</tbody></table></div></section>
       <footer className="footer-note"><span>포스코퓨처엠 스마트팩토리 운영 시스템</span><span>시연용 프로토타입 · 실제 센서 데이터가 아닌 시뮬레이션 데이터입니다</span></footer>
       {showReport && <div className="modal-backdrop" role="presentation" onClick={() => setShowReport(false)}><section className="report-modal" role="dialog" aria-modal="true" aria-labelledby="report-title" onClick={(event) => event.stopPropagation()}><button className="modal-close" onClick={() => setShowReport(false)} aria-label="리포트 닫기">×</button><span className="section-kicker">DIAGNOSTIC REPORT</span><h2 id="report-title">{selected.id} 상세 진단 리포트</h2><div className="report-status"><span className={`status-badge status-${selected.status}`}>{selected.status}</span><strong>{selected.status === "점검" ? "즉시 현장 점검이 필요합니다" : "현재 운용 상태가 안정적입니다"}</strong></div><div className="report-grid"><InfoRow label="주요 감지 항목" value={selected.status === "점검" ? "모터 온도 · 진동 RMS" : "특이사항 없음"} /><InfoRow label="권고 조치" value={selected.status === "점검" ? "운행 중지 후 정비구역 이동" : "예정 정비 일정에 따라 점검"} /><InfoRow label="분석 기준" value="최근 30분 시뮬레이션 추이" /></div><button className="report-button" onClick={() => setShowReport(false)}>확인</button></section></div>}
     </main>
