@@ -25,7 +25,7 @@ test("renders the forklift digital twin dashboard", async () => {
   assert.match(html, /data-moving="true"/);
   assert.match(html, /Twin AI/);
   assert.match(html, /랜덤 이상상황/);
-  assert.match(html, /시뮬레이션 타이머/);
+  assert.doesNotMatch(html, /시뮬레이션 타이머/);
   assert.doesNotMatch(html, /NaN/);
   assert.match(html, /실시간 시뮬레이션/);
   assert.match(html, /랜덤 이상상황/);
