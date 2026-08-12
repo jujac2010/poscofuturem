@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./realistic-forklift-final.css";
 
 export const metadata: Metadata = {
   title: "포스코퓨처엠 지게차 디지털 트윈 및 실시간 시뮬레이션",
