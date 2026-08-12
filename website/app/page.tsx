@@ -12,7 +12,8 @@ type Forklift = {
   battery: number;
   temperature: number;
   vibration: number;
-  load: number;
+  coolantTemperature: number;
+  engineOilTemperature: number;
   hours: string;
   risk: string;
   x: number;
@@ -21,11 +22,11 @@ type Forklift = {
 };
 
 const initialForklifts: Forklift[] = [
-  { id: "P-01호", zone: "원료 야드", task: "원료 이송", status: "정상", battery: 86, temperature: 48, vibration: 1.8, load: 1.4, hours: "4,218 h", risk: "낮음", x: 20, y: 29, route: "원료 야드 → 저장동" },
-  { id: "P-02호", zone: "저장동", task: "양극재 적재", status: "정상", battery: 72, temperature: 52, vibration: 2.1, load: 1.8, hours: "3,806 h", risk: "낮음", x: 53, y: 25, route: "저장동 내부 순환" },
-  { id: "P-03호", zone: "출하장", task: "출하 대기", status: "정상", battery: 64, temperature: 57, vibration: 2.6, load: 1.1, hours: "5,140 h", risk: "보통", x: 77, y: 54, route: "출하장 → 대기 충전" },
-  { id: "P-04호", zone: "정비구역", task: "점검 후 대기", status: "주의", battery: 48, temperature: 62, vibration: 3.2, load: 0.4, hours: "6,027 h", risk: "보통", x: 24, y: 73, route: "정비구역 고정" },
-  { id: "P-05호", zone: "대기 충전", task: "충전 중", status: "정상", battery: 91, temperature: 39, vibration: 1.2, load: 0, hours: "2,974 h", risk: "낮음", x: 66, y: 78, route: "대기 충전 고정" },
+  { id: "P-01호", zone: "원료 야드", task: "원료 이송", status: "정상", battery: 86, temperature: 48, coolantTemperature: 72, engineOilTemperature: 68, vibration: 1.8, hours: "4,218 h", risk: "낮음", x: 20, y: 29, route: "원료 야드 → 저장동" },
+  { id: "P-02호", zone: "저장동", task: "양극재 적재", status: "정상", battery: 72, temperature: 52, coolantTemperature: 75, engineOilTemperature: 70, vibration: 2.1, hours: "3,806 h", risk: "낮음", x: 53, y: 25, route: "저장동 내부 순환" },
+  { id: "P-03호", zone: "출하장", task: "출하 대기", status: "정상", battery: 64, temperature: 57, coolantTemperature: 78, engineOilTemperature: 74, vibration: 2.6, hours: "5,140 h", risk: "보통", x: 77, y: 54, route: "출하장 → 대기 충전" },
+  { id: "P-04호", zone: "정비구역", task: "점검 후 대기", status: "주의", battery: 48, temperature: 62, coolantTemperature: 82, engineOilTemperature: 79, vibration: 3.2, hours: "6,027 h", risk: "보통", x: 24, y: 73, route: "정비구역 고정" },
+  { id: "P-05호", zone: "대기 충전", task: "충전 중", status: "정상", battery: 91, temperature: 39, coolantTemperature: 68, engineOilTemperature: 64, vibration: 1.2, hours: "2,974 h", risk: "낮음", x: 66, y: 78, route: "대기 충전 고정" },
 ];
 
 const movementRoutes: Record<string, Array<[number, number]>> = {
@@ -84,10 +85,10 @@ export default function Home() {
       });
       setForklifts((current) => current.map((forklift) => {
         if (forklift.status === "점검") {
-          return { ...forklift, battery: Math.max(18, forklift.battery - 0.04 * speed), temperature: Math.min(96, forklift.temperature + 0.09 * speed), vibration: Math.min(9.8, forklift.vibration + 0.04 * speed) };
+          return { ...forklift, battery: Math.max(18, forklift.battery - 0.04 * speed), temperature: Math.min(96, forklift.temperature + 0.09 * speed), coolantTemperature: Math.min(108, forklift.coolantTemperature + 0.12 * speed), engineOilTemperature: Math.min(112, forklift.engineOilTemperature + 0.14 * speed), vibration: Math.min(9.8, forklift.vibration + 0.04 * speed) };
         }
         const drift = Math.sin(Date.now() / 3100 + forklift.id.charCodeAt(2)) * 0.22;
-        return { ...forklift, battery: Math.max(20, forklift.battery - 0.008 * speed), temperature: Math.max(35, Math.min(78, forklift.temperature + drift * 0.06)), vibration: Math.max(0.8, Math.min(4.5, forklift.vibration + drift * 0.025)) };
+        return { ...forklift, battery: Math.max(20, forklift.battery - 0.008 * speed), temperature: Math.max(35, Math.min(78, forklift.temperature + drift * 0.06)), coolantTemperature: Math.max(55, Math.min(98, forklift.coolantTemperature + drift * 0.12)), engineOilTemperature: Math.max(52, Math.min(102, forklift.engineOilTemperature + drift * 0.14)), vibration: Math.max(0.8, Math.min(4.5, forklift.vibration + drift * 0.025)) };
       }));
       liveRecordPulse.current += 1;
       if (liveRecordPulse.current >= Math.max(2, Math.floor(5 / speed))) {
@@ -114,7 +115,7 @@ export default function Home() {
 
   function triggerRandomIncident(preferredId?: string) {
     const targetId = preferredId ?? forklifts[Math.floor(Math.random() * forklifts.length)].id;
-    setForklifts((current) => current.map((forklift) => forklift.id === targetId ? { ...forklift, status: "점검", temperature: Math.max(82, forklift.temperature + 18 + Math.random() * 8), vibration: Math.max(6.2, forklift.vibration + 2.8 + Math.random() * 1.5), risk: "높음", task: "긴급 점검 대기" } : forklift));
+    setForklifts((current) => current.map((forklift) => forklift.id === targetId ? { ...forklift, status: "점검", temperature: Math.max(82, forklift.temperature + 18 + Math.random() * 8), coolantTemperature: Math.max(101, forklift.coolantTemperature + 16 + Math.random() * 7), engineOilTemperature: Math.max(104, forklift.engineOilTemperature + 18 + Math.random() * 8), vibration: Math.max(6.2, forklift.vibration + 2.8 + Math.random() * 1.5), risk: "높음", task: "긴급 점검 대기" } : forklift));
     setSelectedId(targetId);
     setLastEvent(`09:43:02 · ${targetId} 이상 징후 랜덤 감지 · 점검 필요`);
     setLiveEvents((current) => [{ time: new Date().toLocaleTimeString("ko-KR", { hour12: false }), label: targetId, text: "이상 징후 감지 · 점검 필요", tone: "critical" }, ...current].slice(0, 8));
@@ -161,7 +162,7 @@ export default function Home() {
           <div className="map-footer"><span><Icon>⌖</Icon> 현장 좌표 기준 · 2026.08.12</span><span>구역을 선택하면 장비 위치가 강조됩니다</span></div>
         </div>
 
-        <aside className="detail-card panel" aria-label="선택 지게차 상세 정보"><div className="panel-header detail-heading"><div><span className="section-kicker">FORKLIFT DETAIL</span><h2>{selected.id}</h2></div><span className={`status-badge status-${selected.status}`}>{selected.status}</span></div><div className="detail-location"><Icon>⌖</Icon><div><span>현재 위치</span><strong>{selected.zone}</strong></div><div className="task-label"><span>현재 작업</span><strong>{selected.task}</strong></div></div><div className="metric-grid"><Metric label="배터리 잔량" value={`${Math.round(selected.battery)}%`} sub={selected.battery < 35 ? "충전 필요" : "운용 가능"} tone={selected.battery < 35 ? "red" : "green"} /><Metric label="모터 온도" value={`${Math.round(selected.temperature)}°C`} sub={selected.temperature > 75 ? "과열 감지" : "정상 범위"} tone={selected.temperature > 75 ? "red" : "orange"} /><Metric label="진동 RMS" value={`${selected.vibration.toFixed(1)} mm/s`} sub={selected.vibration > 5 ? "이상 상승" : "안정"} tone={selected.vibration > 5 ? "red" : "teal"} /><Metric label="적재량" value={`${selected.load.toFixed(1)} t`} sub="정격 2.5 t" tone="teal" /></div><div className="detail-list"><InfoRow label="누적 운행 시간" value={selected.hours} /><InfoRow label="위험도" value={selected.risk} emphasis={selected.risk === "높음" ? "danger" : ""} /><InfoRow label="정비 권고" value={selected.status === "점검" ? "즉시 점검 필요" : selected.status === "주의" ? "금일 점검 권고" : "예정 정비 없음"} emphasis={selected.status === "점검" ? "danger" : ""} /></div><SensorChart forklift={selected} /><button className="report-button" onClick={() => setShowReport(true)}>상세 진단 리포트 <span>↗</span></button></aside>
+        <aside className="detail-card panel" aria-label="선택 지게차 상세 정보"><div className="panel-header detail-heading"><div><span className="section-kicker">FORKLIFT DETAIL</span><h2>{selected.id}</h2></div><span className={`status-badge status-${selected.status}`}>{selected.status}</span></div><div className="detail-location"><Icon>⌖</Icon><div><span>현재 위치</span><strong>{selected.zone}</strong></div><div className="task-label"><span>현재 작업</span><strong>{selected.task}</strong></div></div><div className="metric-grid"><Metric label="배터리 잔량" value={`${Math.round(selected.battery)}%`} sub={selected.battery < 35 ? "충전 필요" : "운용 가능"} tone={selected.battery < 35 ? "red" : "green"} /><Metric label="냉각수 온도" value={`${Math.round(selected.coolantTemperature)}°C`} sub={selected.coolantTemperature > 95 ? "냉각 점검" : "정상 범위"} tone={selected.coolantTemperature > 95 ? "red" : "orange"} /><Metric label="엔진오일 온도" value={`${Math.round(selected.engineOilTemperature)}°C`} sub={selected.engineOilTemperature > 98 ? "오일 점검" : "정상 범위"} tone={selected.engineOilTemperature > 98 ? "red" : "orange"} /><Metric label="진동 RMS" value={`${selected.vibration.toFixed(1)} mm/s`} sub={selected.vibration > 5 ? "이상 상승" : "안정"} tone={selected.vibration > 5 ? "red" : "teal"} /></div><div className="detail-list"><InfoRow label="누적 운행 시간" value={selected.hours} /><InfoRow label="위험도" value={selected.risk} emphasis={selected.risk === "높음" ? "danger" : ""} /><InfoRow label="정비 권고" value={selected.status === "점검" ? "즉시 점검 필요" : selected.status === "주의" ? "금일 점검 권고" : "예정 정비 없음"} emphasis={selected.status === "점검" ? "danger" : ""} /></div><SensorChart forklift={selected} /><button className="report-button" onClick={() => setShowReport(true)}>상세 진단 리포트 <span>↗</span></button></aside>
       </section>
 
       <section className="bottom-grid"><div className="fleet-card panel"><div className="panel-header"><div><span className="section-kicker">FLEET OVERVIEW</span><h2>전체 지게차 현황</h2></div><span className="panel-meta">5대 운용 중</span></div><div className="fleet-list">{forklifts.map((forklift) => <button key={forklift.id} className={`fleet-row ${selected.id === forklift.id ? "selected" : ""}`} onClick={() => setSelectedId(forklift.id)}><span className={`mini-vehicle status-${forklift.status}`}>▰</span><span className="fleet-id">{forklift.id}<small>{forklift.zone}</small></span><span className={`fleet-status status-${forklift.status}`}>{forklift.status}</span><span className="fleet-battery"><span className="battery-track"><i style={{ width: `${forklift.battery}%` }} /></span>{Math.round(forklift.battery)}%</span><span className="fleet-temp">{Math.round(forklift.temperature)}°C</span><span className="row-arrow">›</span></button>)}</div></div><div className="event-card panel"><div className="panel-header"><div><span className="section-kicker">EVENT LOG</span><h2>이벤트 로그</h2></div><span className="panel-meta"><span className="live-dot" /> LIVE</span></div><div className="event-list">{liveEvents.map((event, index) => <div className={`event-row ${event.tone === "critical" ? "event-critical" : ""}`} key={`${event.time}-${event.label}-${index}`}><span className="event-time">{event.time}</span><span className={`event-dot ${event.tone}`} /><span><b>{event.label}</b> {event.text}</span></div>)}</div></div></section>
