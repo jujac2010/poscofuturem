@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>포스코퓨처엠 지게차 디지털 트윈 및 실시간 시뮬레이션 - 제작 플랜</title>
+  <style>
+    :root{--bg:#081317;--panel:#102229;--panel2:#142b32;--line:#24434a;--text:#eaf7f4;--muted:#9ab6b6;--teal:#39d1c3;--green:#7ee36a;--orange:#f6a340;--red:#ff6d61;--yellow:#f1c75b}
+    *{box-sizing:border-box} body{margin:0;background:radial-gradient(circle at 15% 0%,#173b40 0,#081317 42%);color:var(--text);font-family:Inter,"Noto Sans KR",Arial,sans-serif;line-height:1.65}
+    .wrap{max-width:1180px;margin:auto;padding:48px 24px 72px}.eyebrow{color:var(--teal);font-size:13px;font-weight:800;letter-spacing:.16em}.hero{padding:38px 0 30px;border-bottom:1px solid var(--line)}h1{font-size:clamp(32px,5vw,62px);line-height:1.12;margin:12px 0 18px;max-width:880px}h2{margin:0 0 18px;font-size:25px}h3{margin:0 0 8px;font-size:18px}.lead{color:#c6dada;font-size:18px;max-width:820px}.meta{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}.chip{border:1px solid var(--line);background:rgba(20,43,50,.72);border-radius:999px;padding:6px 12px;color:#cbe8e5;font-size:13px}
+    section{padding:38px 0;border-bottom:1px solid rgba(36,67,74,.7)}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}.card{grid-column:span 4;background:linear-gradient(145deg,rgba(20,43,50,.95),rgba(13,29,34,.95));border:1px solid var(--line);border-radius:18px;padding:20px}.wide{grid-column:span 6}.full{grid-column:1/-1}.number{color:var(--orange);font-size:12px;font-weight:800;letter-spacing:.12em}.muted{color:var(--muted)}.accent{color:var(--teal)}.success{color:var(--green)}.warn{color:var(--yellow)}.danger{color:var(--red)}
+    .timeline{display:grid;gap:12px}.phase{display:grid;grid-template-columns:86px 1fr auto;gap:18px;align-items:center;padding:17px 18px;border:1px solid var(--line);border-radius:14px;background:rgba(16,34,41,.78)}.phase-no{font-size:28px;font-weight:900;color:var(--orange)}.status{font-size:12px;color:var(--teal);white-space:nowrap}.flow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.flow span{padding:10px 13px;border-radius:10px;background:#15343a;border:1px solid #2b555a;font-size:13px}.arrow{color:var(--orange)}
+    table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--teal);font-size:12px;letter-spacing:.08em}ul{margin:8px 0 0;padding-left:20px}.check{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.check div{padding:12px;border:1px solid var(--line);border-radius:12px;background:#0e2025}.check div::before{content:'✓';color:var(--green);font-weight:900;margin-right:8px}.footer{padding-top:24px;color:var(--muted);font-size:13px}
+    @media(max-width:760px){.wrap{padding:28px 16px 48px}.card,.wide{grid-column:1/-1}.phase{grid-template-columns:54px 1fr}.status{grid-column:2}.check{grid-template-columns:1fr}h1{font-size:36px}.lead{font-size:16px}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="hero">
+      <div class="eyebrow">PROJECT DELIVERY PLAN · 2026.08</div>
+      <h1>포스코퓨처엠 지게차 디지털 트윈 및 실시간 시뮬레이션</h1>
+      <p class="lead">제철소·물류센터 현장의 5대 전동 지게차를 디지털 트윈으로 표현하고, 배터리·온도·진동 데이터를 실시간으로 시뮬레이션해 이상 징후를 조기에 확인하는 시연형 관제 프로젝트입니다.</p>
+      <div class="meta"><span class="chip">FORK-A ~ FORK-E</span><span class="chip">React / TypeScript</span><span class="chip">반응형 관제 대시보드</span><span class="chip">PPT · PDF · README</span></div>
+    </header>
+
+    <section>
+      <h2>01. 문제와 가설</h2>
+      <div class="grid">
+        <article class="card wide"><div class="number">문제 상황</div><h3>수기 기록과 경험 의존 운영</h3><p class="muted">기존 지게차 운영은 작업자의 경험과 수기 기록에 의존하여 배터리 부족, 과열, 진동 이상을 사전에 파악하기 어렵습니다. 그 결과 작업 중단과 긴급 정비가 발생하고 관리자가 전체 장비 상태를 한눈에 확인하기 어렵습니다.</p></article>
+        <article class="card wide"><div class="number">핵심 가설</div><h3>상태를 한 화면에 연결하면 대응이 빨라진다</h3><p class="muted">지게차 위치·운행 상태·센서 추이·이벤트 로그를 하나의 현장 배치도에 연결하면 관리자는 이상 징후를 더 빨리 발견하고 점검 우선순위를 판단할 수 있습니다.</p></article>
+      </div>
+    </section>
+
+    <section>
+      <h2>02. 전체 제작 로드맵</h2>
+      <div class="timeline">
+        <div class="phase"><div class="phase-no">01</div><div><h3>자료 분석·범위 확정</h3><div class="muted">원본 이미지, 기존 PPT, 시연 이미지, 이전 사이트/설계 문서 분석</div></div><div class="status">완료/기반 확보</div></div>
+        <div class="phase"><div class="phase-no">02</div><div><h3>대시보드 UX·시각 설계</h3><div class="muted">어두운 제철소 관제 톤, 청록·녹색·주황 포인트, 지도·패널·로그 구조 확정</div></div><div class="status">다음 단계</div></div>
+        <div class="phase"><div class="phase-no">03</div><div><h3>웹사이트 구현</h3><div class="muted">5대 지게차, 위치 배치도, 툴팁, 상세 패널, 센서 그래프, 시뮬레이션 구현</div></div><div class="status">핵심 개발</div></div>
+        <div class="phase"><div class="phase-no">04</div><div><h3>발표자료 재구성</h3><div class="muted">문제 정의부터 회고·향후 활용까지 평가 기준에 맞춰 기존 PPT 템플릿에 반영</div></div><div class="status">콘텐츠 제작</div></div>
+        <div class="phase"><div class="phase-no">05</div><div><h3>렌더링·검수·패키징</h3><div class="muted">PPTX/PDF 렌더링, 모바일 검수, 시연 시나리오, README, 시연 이미지 정리</div></div><div class="status">최종 QA</div></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>03. 웹사이트 구현 범위</h2>
+      <div class="grid">
+        <article class="card"><div class="number">현장 뷰</div><h3>디지털 트윈 배치도</h3><ul class="muted"><li>원료 야드</li><li>저장동</li><li>출하장</li><li>정비구역</li><li>대기 충전</li></ul></article>
+        <article class="card"><div class="number">장비 상태</div><h3>5대 실시간 카드</h3><ul class="muted"><li>FORK-A ~ FORK-E</li><li>정상·주의·점검 색상 구분</li><li>이름/위치/상태 명확화</li><li>마우스 오버 툴팁</li></ul></article>
+        <article class="card"><div class="number">진단 패널</div><h3>클릭 상세 정보</h3><ul class="muted"><li>위치·작업·운행 상태</li><li>배터리·모터 온도</li><li>진동 RMS·적재량</li><li>운행 시간·위험도·정비 권고</li><li>최근 센서 추이 그래프</li></ul></article>
+        <article class="card wide"><div class="number">시뮬레이션</div><h3>시간에 따른 자연스러운 변화</h3><p class="muted">재생·일시정지와 1배·2배·4배 속도를 제공하고, 배터리는 완만히 감소하며 온도·진동은 운행 상태와 작업 부하에 따라 변합니다.</p></article>
+        <article class="card wide"><div class="number">이상상황</div><h3>FORK-C 점검 시나리오</h3><p class="muted">이상상황 발생 버튼을 누르면 FORK-C의 온도와 진동이 상승하고 상태가 점검 필요로 바뀌며, 이벤트 로그에 원인과 시각이 기록됩니다.</p></article>
+      </div>
+    </section>
+
+    <section>
+      <h2>04. 기술·데이터 구조</h2>
+      <div class="flow"><span>React / TypeScript</span><b class="arrow">→</b><span>상태 관리</span><b class="arrow">→</b><span>센서 시뮬레이터</span><b class="arrow">→</b><span>배치도·카드·그래프</span><b class="arrow">→</b><span>이벤트 로그·진단 리포트</span></div>
+      <div class="grid" style="margin-top:18px"><article class="card wide"><h3>선택 이유</h3><p class="muted">React는 지도·카드·상세 패널처럼 상태가 연결된 화면을 컴포넌트 단위로 구성하기 좋고, TypeScript는 센서 데이터 구조와 상태 전이를 안전하게 관리합니다. 반응형 CSS로 데스크톱 관제 화면과 모바일 점검 화면을 함께 대응합니다.</p></article><article class="card wide"><h3>확장 방향</h3><p class="muted">현재는 시연용 메모리 상태를 사용하고, 실제 운영 시 IoT 게이트웨이·PLC·MES API를 연결합니다. 데이터베이스에는 장비·센서·이벤트 이력을 저장하고 인증/권한으로 현장·관리자 접근을 분리합니다.</p></article></div>
+      <table style="margin-top:18px"><thead><tr><th>영역</th><th>선택 기술</th><th>대안 검토</th></tr></thead><tbody><tr><td>UI</td><td>React + TypeScript</td><td>Next.js는 서버 라우팅/배포가 필요할 때 확장</td></tr><tr><td>시각화</td><td>SVG/CSS 기반 현장 지도, 경량 차트</td><td>대규모 시계열은 Recharts/ECharts 도입</td></tr><tr><td>실시간 연동</td><td>시뮬레이터 상태 업데이트</td><td>운영 단계에서 WebSocket/MQTT/REST API</td></tr><tr><td>저장·보안</td><td>프로토타입은 로컬 상태</td><td>운영 단계에서 DB, SSO, RBAC, 감사 로그</td></tr></tbody></table>
+    </section>
+
+    <section>
+      <h2>05. 발표자료 구성</h2>
+      <div class="grid">
+        <article class="card wide"><div class="number">문제에서 목표까지</div><p>문제 상황 → 중요한 이유 → 관점과 가설 → 과제 목표 → 해결 전략</p></article>
+        <article class="card wide"><div class="number">시스템 설명</div><p>서비스 개요 → 전체 아키텍처 → 주요 기능 → 사용 기술 → 교육 내용과의 연계</p></article>
+        <article class="card wide"><div class="number">과정과 근거</div><p>기술 선택 이유와 대안 → 시행착오와 실패 경험 → 멘토링·코칭 피드백 반영</p></article>
+        <article class="card wide"><div class="number">결과와 회고</div><p>결과 시연 → 정량적 예상 효과 → 정성적 기대 효과 → 인사이트·회고 → 교육 소감 → 향후 실무 활용 계획</p></article>
+      </div>
+      <p class="muted" style="margin-top:18px">정량 효과는 실제 측정값이 아닌 경우 반드시 <span class="warn">“시연용 예상 효과”</span> 또는 <span class="warn">“프로토타입 기준 기대 효과”</span>로 표기합니다.</p>
+    </section>
+
+    <section>
+      <h2>06. 발표 시연 플로우</h2>
+      <div class="flow"><span>1. 대시보드 접속</span><b class="arrow">→</b><span>2. 5대 상태 확인</span><b class="arrow">→</b><span>3. FORK-A 툴팁</span><b class="arrow">→</b><span>4. FORK-C 상세</span><b class="arrow">→</b><span>5. 2배속</span><b class="arrow">→</b><span>6. 수치 변화</span><b class="arrow">→</b><span>7. 이상상황</span><b class="arrow">→</b><span>8. 점검 상태</span><b class="arrow">→</b><span>9. 이벤트 로그</span><b class="arrow">→</b><span>10. 진단 리포트</span></div>
+    </section>
+
+    <section>
+      <h2>07. 최종 산출물</h2>
+      <div class="check"><div>완성된 반응형 웹사이트</div><div>발표용 PPTX</div><div>PDF 발표자료</div><div>시연용 이미지</div><div>화면 녹화 시나리오</div><div>프로젝트 설명 README</div><div>문제 정의·가설·회고 콘텐츠</div><div>최종 검수 체크리스트</div></div>
+    </section>
+
+    <section>
+      <h2>08. 최종 검수 기준</h2>
+      <div class="grid"><article class="card wide"><h3 class="success">기능 검수</h3><p class="muted">5대 표시 · 이름 정확성 · 툴팁 · 클릭 상세 패널 · 실시간 수치 변화 · 이상상황 · 이벤트 로그 · 진단 리포트</p></article><article class="card wide"><h3 class="success">품질 검수</h3><p class="muted">자연스러운 한글 · 두산 브랜드 제거 · 모바일 깨짐 없음 · 키보드 접근성 · 발표자료 평가 항목 전체 포함</p></article></div>
+    </section>
+
+    <footer class="footer">본 문서는 포스코퓨처엠 현장 지게차 모니터링 프로젝트의 제작·검수 계획을 설명하는 시연용 플랜입니다.</footer>
+  </main>
+</body>
+</html>
