@@ -142,7 +142,7 @@ export default function Home() {
       <header className="topbar">
         <div className="brand-lockup"><div className="brand-mark">PF</div><div><strong>POSCO FUTURE M</strong><span>현장 운영 관제</span></div></div>
         <div className="title-block"><span className="eyebrow">DIGITAL TWIN CONTROL ROOM</span><h1>지게차 디지털 트윈 및 실시간 시뮬레이션</h1></div>
-        <div className="top-actions"><span className="live-pill"><i /> LIVE · {liveClock}</span><button className="ghost-button" onClick={() => setPaused((value) => !value)} aria-label={paused ? "시뮬레이션 재생" : "시뮬레이션 일시정지"}>{paused ? "▶ 재생" : "Ⅱ 일시정지"}</button></div>
+        <div className="top-actions"><span className="live-pill"><i /> LIVE · {liveClock}</span></div>
       </header>
 
       <section className="status-strip" aria-label="현장 요약"><div><span className="strip-label">운용 장비</span><strong>05 <small>대</small></strong></div><div><span className="strip-label">정상 운행</span><strong className="green">{stats.normal} <small>대</small></strong></div><div><span className="strip-label">주의 관찰</span><strong className="yellow">{stats.warning} <small>대</small></strong></div><div><span className="strip-label">점검 필요</span><strong className="red">{stats.check} <small>대</small></strong></div><div className="strip-note"><Icon>⌁</Icon> 마지막 데이터 수신 <b>2.4초 전</b></div></section>
