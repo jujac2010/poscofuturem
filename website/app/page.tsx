@@ -21,33 +21,43 @@ type Forklift = {
 };
 
 const initialForklifts: Forklift[] = [
-  { id: "FORK-A", zone: "원료 야드", task: "원료 이송", status: "정상", battery: 86, temperature: 48, vibration: 1.8, load: 1.4, hours: "4,218 h", risk: "낮음", x: 20, y: 29, route: "원료 야드 → 저장동" },
-  { id: "FORK-B", zone: "저장동", task: "양극재 적재", status: "정상", battery: 72, temperature: 52, vibration: 2.1, load: 1.8, hours: "3,806 h", risk: "낮음", x: 53, y: 25, route: "저장동 내부 순환" },
-  { id: "FORK-C", zone: "출하장", task: "출하 대기", status: "정상", battery: 64, temperature: 57, vibration: 2.6, load: 1.1, hours: "5,140 h", risk: "보통", x: 77, y: 54, route: "출하장 → 대기 충전" },
-  { id: "FORK-D", zone: "정비구역", task: "점검 후 대기", status: "주의", battery: 48, temperature: 62, vibration: 3.2, load: 0.4, hours: "6,027 h", risk: "보통", x: 24, y: 73, route: "정비구역 고정" },
-  { id: "FORK-E", zone: "대기 충전", task: "충전 중", status: "정상", battery: 91, temperature: 39, vibration: 1.2, load: 0, hours: "2,974 h", risk: "낮음", x: 66, y: 78, route: "대기 충전 고정" },
+  { id: "P-01호", zone: "원료 야드", task: "원료 이송", status: "정상", battery: 86, temperature: 48, vibration: 1.8, load: 1.4, hours: "4,218 h", risk: "낮음", x: 20, y: 29, route: "원료 야드 → 저장동" },
+  { id: "P-02호", zone: "저장동", task: "양극재 적재", status: "정상", battery: 72, temperature: 52, vibration: 2.1, load: 1.8, hours: "3,806 h", risk: "낮음", x: 53, y: 25, route: "저장동 내부 순환" },
+  { id: "P-03호", zone: "출하장", task: "출하 대기", status: "정상", battery: 64, temperature: 57, vibration: 2.6, load: 1.1, hours: "5,140 h", risk: "보통", x: 77, y: 54, route: "출하장 → 대기 충전" },
+  { id: "P-04호", zone: "정비구역", task: "점검 후 대기", status: "주의", battery: 48, temperature: 62, vibration: 3.2, load: 0.4, hours: "6,027 h", risk: "보통", x: 24, y: 73, route: "정비구역 고정" },
+  { id: "P-05호", zone: "대기 충전", task: "충전 중", status: "정상", battery: 91, temperature: 39, vibration: 1.2, load: 0, hours: "2,974 h", risk: "낮음", x: 66, y: 78, route: "대기 충전 고정" },
 ];
 
+const movementRoutes: Record<string, Array<[number, number]>> = {
+  "P-01호": [[17, 28], [28, 31], [37, 41], [48, 34], [38, 28], [26, 24]],
+  "P-02호": [[50, 24], [57, 24], [63, 31], [59, 38], [51, 34], [48, 27]],
+  "P-03호": [[75, 49], [82, 52], [87, 60], [80, 67], [72, 61], [76, 53]],
+  "P-04호": [[22, 70], [28, 76], [35, 78], [31, 84], [23, 81], [20, 74]],
+  "P-05호": [[63, 77], [70, 73], [77, 78], [72, 84], [64, 82], [62, 77]],
+};
+
 const events = [
-  { time: "09:42:18", label: "FORK-A", text: "원료 야드 진입 · 정상 운행", tone: "normal" },
-  { time: "09:41:53", label: "FORK-D", text: "정비구역 대기 · 점검 권고 유지", tone: "warning" },
-  { time: "09:40:27", label: "FORK-E", text: "충전 전류 안정화", tone: "normal" },
+  { time: "09:42:18", label: "P-01호", text: "원료 야드 진입 · 정상 운행", tone: "normal" },
+  { time: "09:41:53", label: "P-04호", text: "정비구역 대기 · 점검 권고 유지", tone: "warning" },
+  { time: "09:40:27", label: "P-05호", text: "충전 전류 안정화", tone: "normal" },
 ];
 
 function Icon({ children }: { children: ReactNode }) { return <span className="icon" aria-hidden="true">{children}</span>; }
 
 export default function Home() {
   const [forklifts, setForklifts] = useState(initialForklifts);
-  const [selectedId, setSelectedId] = useState("FORK-C");
+  const [selectedId, setSelectedId] = useState("P-03호");
   const [paused, setPaused] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [lastEvent, setLastEvent] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
+  const [simulationTime, setSimulationTime] = useState(0);
   const selected = forklifts.find((forklift) => forklift.id === selectedId) ?? forklifts[0];
 
   useEffect(() => {
     if (paused) return;
     const timer = window.setInterval(() => {
+      setSimulationTime((current) => (current + 0.018 * speed) % 1);
       setForklifts((current) => current.map((forklift) => {
         if (forklift.status === "점검") {
           return { ...forklift, battery: Math.max(18, forklift.battery - 0.04 * speed), temperature: Math.min(96, forklift.temperature + 0.09 * speed), vibration: Math.min(9.8, forklift.vibration + 0.04 * speed) };
@@ -55,16 +65,25 @@ export default function Home() {
         const drift = Math.sin(Date.now() / 3100 + forklift.id.charCodeAt(5)) * 0.22;
         return { ...forklift, battery: Math.max(20, forklift.battery - 0.008 * speed), temperature: Math.max(35, Math.min(78, forklift.temperature + drift * 0.06)), vibration: Math.max(0.8, Math.min(4.5, forklift.vibration + drift * 0.025)) };
       }));
-    }, 1100);
+    }, 200);
     return () => window.clearInterval(timer);
   }, [paused, speed]);
 
   const stats = useMemo(() => ({ normal: forklifts.filter((item) => item.status === "정상").length, warning: forklifts.filter((item) => item.status === "주의").length, check: forklifts.filter((item) => item.status === "점검").length }), [forklifts]);
 
   function triggerIncident() {
-    setForklifts((current) => current.map((forklift) => forklift.id === "FORK-C" ? { ...forklift, status: "점검", temperature: Math.max(82, forklift.temperature + 22), vibration: Math.max(6.4, forklift.vibration + 3.5), risk: "높음", task: "긴급 점검 대기" } : forklift));
-    setSelectedId("FORK-C");
-    setLastEvent("09:43:02 · FORK-C 온도·진동 상승 감지 · 점검 필요");
+    setForklifts((current) => current.map((forklift) => forklift.id === "P-03호" ? { ...forklift, status: "점검", temperature: Math.max(82, forklift.temperature + 22), vibration: Math.max(6.4, forklift.vibration + 3.5), risk: "높음", task: "긴급 점검 대기" } : forklift));
+    setSelectedId("P-03호");
+    setLastEvent("09:43:02 · P-03호 온도·진동 상승 감지 · 점검 필요");
+  }
+
+  function positionFor(forklift: Forklift) {
+    const points = movementRoutes[forklift.id] ?? [[forklift.x, forklift.y]];
+    const scaled = simulationTime * points.length;
+    const index = Math.floor(scaled) % points.length;
+    const next = (index + 1) % points.length;
+    const amount = scaled - Math.floor(scaled);
+    return { left: `${points[index][0] + (points[next][0] - points[index][0]) * amount}%`, top: `${points[index][1] + (points[next][1] - points[index][1]) * amount}%` };
   }
 
   return (
@@ -77,14 +96,14 @@ export default function Home() {
 
       <section className="status-strip" aria-label="현장 요약"><div><span className="strip-label">운용 장비</span><strong>05 <small>대</small></strong></div><div><span className="strip-label">정상 운행</span><strong className="green">{stats.normal} <small>대</small></strong></div><div><span className="strip-label">주의 관찰</span><strong className="yellow">{stats.warning} <small>대</small></strong></div><div><span className="strip-label">점검 필요</span><strong className="red">{stats.check} <small>대</small></strong></div><div className="strip-note"><Icon>⌁</Icon> 마지막 데이터 수신 <b>2.4초 전</b></div></section>
 
-      <section className="control-bar"><div className="section-kicker"><span className="live-dot" /> 실시간 시뮬레이션</div><div className="control-actions"><span className="control-label">속도</span>{[1, 2, 4].map((value) => <button key={value} className={`speed-button ${speed === value ? "active" : ""}`} onClick={() => setSpeed(value)}>{value}배</button>)}<button className="incident-button" onClick={triggerIncident}><Icon>⚠</Icon> 이상상황 발생</button></div></section>
+      <section className="control-bar"><div className="section-kicker"><span className="live-dot" /> 실시간 이동 시뮬레이션 <small className="motion-readout">경로 추적 중 · {paused ? "일시정지" : `${speed}배속`}</small></div><div className="control-actions"><span className="control-label">속도</span>{[1, 2, 4].map((value) => <button key={value} className={`speed-button ${speed === value ? "active" : ""}`} onClick={() => setSpeed(value)}>{value}배</button>)}<button className="incident-button" onClick={triggerIncident}><Icon>⚠</Icon> 이상상황 발생</button></div></section>
 
       <section className="main-grid">
         <div className="map-card panel">
           <div className="panel-header"><div><span className="section-kicker">LIVE SITE MAP</span><h2>현장 배치도</h2></div><div className="legend"><span><i className="legend-dot green-bg" />정상</span><span><i className="legend-dot yellow-bg" />주의</span><span><i className="legend-dot red-bg" />점검</span></div></div>
           <div className="map-canvas" aria-label="5대 지게차가 표시된 현장 배치도">
             <div className="map-grid-lines" /><div className="north">N</div><div className="zone zone-yard"><span>원료 야드</span><small>RAW MATERIAL YARD</small></div><div className="zone zone-storage"><span>저장동</span><small>STORAGE BUILDING</small></div><div className="zone zone-shipping"><span>출하장</span><small>SHIPPING DOCK</small></div><div className="zone zone-maintenance"><span>정비구역</span><small>MAINTENANCE</small></div><div className="zone zone-charge"><span>대기 충전</span><small>CHARGE BAY</small></div><div className="road road-one" /><div className="road road-two" />
-            {forklifts.map((forklift) => <button key={forklift.id} className={`forklift-marker status-${forklift.status}`} style={{ left: `${forklift.x}%`, top: `${forklift.y}%` }} onClick={() => setSelectedId(forklift.id)} aria-label={`${forklift.id} 상세 보기`}><span className="forklift-icon">▰</span><span className="marker-label">{forklift.id}</span><span className="tooltip"><b>{forklift.id}</b><span>{forklift.zone} · {forklift.status}</span><span>배터리 {Math.round(forklift.battery)}% · 모터 {Math.round(forklift.temperature)}°C</span></span></button>)}
+            {forklifts.map((forklift) => <button key={forklift.id} data-moving="true" className={`forklift-marker status-${forklift.status}`} style={positionFor(forklift)} onClick={() => setSelectedId(forklift.id)} aria-label={`${forklift.id} 상세 보기`}><span className="motion-ring" /><span className="forklift-icon">▰</span><span className="marker-label">{forklift.id}</span><span className="tooltip"><b>{forklift.id}</b><span>{forklift.zone} · {forklift.status}</span><span>배터리 {Math.round(forklift.battery)}% · 모터 {Math.round(forklift.temperature)}°C</span><span className="tooltip-route">↗ {forklift.route}</span></span></button>)}
           </div>
           <div className="map-footer"><span><Icon>⌖</Icon> 현장 좌표 기준 · 2026.08.12</span><span>구역을 선택하면 장비 위치가 강조됩니다</span></div>
         </div>

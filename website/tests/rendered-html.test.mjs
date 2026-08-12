@@ -18,9 +18,11 @@ test("renders the forklift digital twin dashboard", async () => {
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /포스코퓨처엠 지게차 디지털 트윈 및 실시간 시뮬레이션/);
-  for (const forklift of ["FORK-A", "FORK-B", "FORK-C", "FORK-D", "FORK-E"]) {
+  for (const forklift of ["P-01호", "P-02호", "P-03호", "P-04호", "P-05호"]) {
     assert.match(html, new RegExp(forklift));
   }
+  assert.match(html, /실시간 이동 시뮬레이션/);
+  assert.match(html, /data-moving="true"/);
   assert.match(html, /실시간 시뮬레이션/);
   assert.match(html, /이상상황 발생/);
   assert.match(html, /최근 센서 추이/);
