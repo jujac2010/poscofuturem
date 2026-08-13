@@ -34,6 +34,9 @@ const initialForklifts: Forklift[] = [
   { id: "P-05호", zone: "대기 충전", task: "충전 중", status: "정상", battery: 91, temperature: 39, coolantTemperature: 68, engineOilTemperature: 64, vibration: 1.2, hours: "2,974 h", risk: "낮음", x: 66, y: 78, route: "대기 충전 고정" },
 ];
 
+// 현장 시연은 P-01호~P-05호 5대만 운행합니다.
+const OPERATING_FORKLIFT_COUNT = 5;
+
 const movementRoutes: Record<string, Array<[number, number]>> = {
   "P-01호": [[17, 28], [28, 31], [37, 41], [48, 34], [38, 28], [26, 24]],
   "P-02호": [[50, 24], [57, 24], [63, 31], [59, 38], [51, 34], [48, 27]],
@@ -217,7 +220,7 @@ export default function Home() {
 
       <section className="status-strip" aria-label="현장 요약"><div><span className="strip-label">운용 장비</span><strong>05 <small>대</small></strong></div><div><span className="strip-label">정상 운행</span><strong className="green">{stats.normal} <small>대</small></strong></div><div><span className="strip-label">주의 관찰</span><strong className="yellow">{stats.warning} <small>대</small></strong></div><div><span className="strip-label">점검 필요</span><strong className="red">{stats.check} <small>대</small></strong></div><div className="strip-note"><Icon>⌁</Icon> 마지막 데이터 수신 <b>2.4초 전</b></div></section>
 
-      <section className="control-bar"><div className="section-kicker"><span className="live-dot" /> Twin AI · 실시간 이동 시뮬레이션 <small className="motion-readout">경로 추적 중</small></div><div className="control-actions"><button className="incident-button" onClick={() => triggerRandomIncident()}><Icon>⚠</Icon> 랜덤 이상상황</button></div></section>
+      <section className="control-bar"><div className="section-kicker"><span className="live-dot" /> Twin AI · 실시간 이동 시뮬레이션 <small className="motion-readout">5대 운행 · 경로 추적 중</small></div><div className="control-actions"><button className="incident-button" onClick={() => triggerRandomIncident()}><Icon>⚠</Icon> 랜덤 이상상황</button></div></section>
 
       <section className="main-grid">
         <div className="map-card panel">
