@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { createEcuDataSource } from "../lib/ecu/factory";
 import type { EcuSnapshot } from "../lib/ecu/types";
 import { evaluateDiagnostic, type DiagnosticReport } from "../lib/diagnostics/evaluator";
@@ -259,12 +259,6 @@ export default function Home() {
     return { left: `${position[0]}%`, top: `${position[1]}%` };
   }
 
-  function headingFor(forklift: Forklift) {
-    const position = livePositions[forklift.id] ?? [forklift.x, forklift.y];
-    const target = randomTargets[forklift.id] ?? position;
-    return `${Math.atan2(target[1] - position[1], target[0] - position[0]) * 180 / Math.PI}deg`;
-  }
-
   return (
     <main className="dashboard-shell">
       <header className="topbar">
@@ -282,9 +276,9 @@ export default function Home() {
           <div className="panel-header"><div><span className="section-kicker">LIVE SITE MAP</span><h2>현장 배치도</h2></div><div className="legend"><span><i className="legend-dot green-bg" />정상</span><span><i className="legend-dot yellow-bg" />주의</span><span><i className="legend-dot red-bg" />점검</span></div></div>
           <div className="map-canvas three-d-twin" data-twin-ai="true" aria-label="Twin AI 3D 현장 배치도">
             <div className="ai-overlay"><span className="ai-orb">✦</span><div><b>Twin AI</b><span>{aiMessage}</span></div></div>
-            <div className="twin-scene" aria-hidden="true"><div className="scene-floor" /><div className="scene-wall wall-back" /><div className="scene-wall wall-right" /><div className="scene-light light-one" /><div className="scene-light light-two" /><div className="scene-rack rack-one"><i /><i /><i /></div><div className="scene-rack rack-two"><i /><i /><i /></div><div className="scene-charger charger-one" /><div className="scene-charger charger-two" /><div className="scene-zone-label label-yard">원료 야드</div><div className="scene-zone-label label-storage">저장동</div><div className="scene-zone-label label-shipping">출하장</div><div className="scene-zone-label label-charge">대기 충전</div></div>
+            <div className="twin-scene" aria-hidden="true"><div className="scene-floor" /><div className="scene-wall wall-back" /><div className="scene-wall wall-right" /><div className="scene-light light-one" /><div className="scene-light light-two" /><div className="scene-rack rack-one"><i /><i /><i /></div><div className="scene-rack rack-two"><i /><i /><i /></div><div className="scene-charger charger-one" /><div className="scene-charger charger-two" /><div className="scene-zone-label label-yard">원료 야드</div><div className="scene-zone-label label-storage">저장동</div><div className="scene-zone-label label-shipping">출하장</div><div className="scene-zone-label label-maintenance">정비구역</div><div className="scene-zone-label label-charge">대기 충전</div></div>
             <div className="map-grid-lines" /><div className="north">N</div><div className="zone zone-yard"><span>원료 야드</span><small>RAW MATERIAL YARD</small></div><div className="zone zone-storage"><span>저장동</span><small>STORAGE BUILDING</small></div><div className="zone zone-shipping"><span>출하장</span><small>SHIPPING DOCK</small></div><div className="zone zone-maintenance"><span>정비구역</span><small>MAINTENANCE</small></div><div className="zone zone-charge"><span>대기 충전</span><small>CHARGE BAY</small></div><div className="road road-one" /><div className="road road-two" />
-            {forklifts.map((forklift) => <button key={forklift.id} data-moving="true" className={`forklift-marker status-${forklift.status}`} style={{ ...positionFor(forklift), "--heading": headingFor(forklift) } as CSSProperties} onClick={() => setSelectedId(forklift.id)} aria-label={`${forklift.id} 상세 보기`}><span className="motion-ring" /><img className="realistic-forklift" src="/forklift-realistic.png" alt="" /><span className="forklift-icon">▰</span><span className="marker-label">{forklift.id}</span><span className="tooltip"><b>{forklift.id}</b><span>{forklift.zone} · {forklift.status}</span><span>배터리 {Math.round(forklift.battery)}% · 모터 {Math.round(forklift.temperature)}°C</span><span className="tooltip-route">↗ 안전 주행 레인</span></span></button>)}
+            {forklifts.map((forklift) => <button key={forklift.id} data-moving="true" className={`forklift-marker status-${forklift.status}`} style={positionFor(forklift)} onClick={() => setSelectedId(forklift.id)} aria-label={`${forklift.id} 상세 보기`}><span className="motion-ring" /><img className="realistic-forklift" src="/forklift-realistic.png" alt="" /><span className="forklift-icon">▰</span><span className="marker-label">{forklift.id}</span><span className="tooltip"><b>{forklift.id}</b><span>{forklift.zone} · {forklift.status}</span><span>배터리 {Math.round(forklift.battery)}% · 모터 {Math.round(forklift.temperature)}°C</span><span className="tooltip-route">구역 표지판: {forklift.zone}</span></span></button>)}
           </div>
           <div className="map-footer"><span><Icon>⌖</Icon> 현장 좌표 기준 · 2026.08.12</span><span>구역을 선택하면 장비 위치가 강조됩니다</span></div>
         </div>
