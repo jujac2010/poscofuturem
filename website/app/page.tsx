@@ -50,6 +50,14 @@ const movementRoutes: Record<string, Array<[number, number]>> = {
   "P-05호": [[82, 54], [85, 50], [88, 46], [88, 46], [88, 46], [88, 46]],
 };
 
+const randomSafePoints: Record<string, Array<[number, number]>> = {
+  "P-01호": [[43, 70], [49, 67], [55, 64], [61, 60], [66, 57]],
+  "P-02호": [[17, 54], [22, 54], [27, 55]],
+  "P-03호": [[53, 27], [59, 26], [65, 27], [71, 30], [75, 33]],
+  "P-04호": [[42, 79], [49, 76], [57, 71], [65, 67], [73, 62], [78, 58]],
+  "P-05호": [[82, 54], [85, 50], [88, 46]],
+};
+
 const events = [
   { time: "09:42:18", label: "P-01호", text: "원료 야드 진입 · 정상 운행", tone: "normal" },
   { time: "09:41:53", label: "P-04호", text: "정비구역 대기 · 점검 권고 유지", tone: "warning" },
@@ -75,6 +83,8 @@ export default function Home() {
   const [showReport, setShowReport] = useState(false);
   const [showFleetReport, setShowFleetReport] = useState(false);
   const [simulationTime, setSimulationTime] = useState(0);
+  const [livePositions, setLivePositions] = useState<Record<string, [number, number]>>(() => Object.fromEntries(initialForklifts.map((forklift) => [forklift.id, [forklift.x, forklift.y]])));
+  const [randomTargets, setRandomTargets] = useState<Record<string, [number, number]>>(() => Object.fromEntries(initialForklifts.map((forklift) => [forklift.id, randomSafePoints[forklift.id][0]])));
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [liveRecords, setLiveRecords] = useState(drivingRecords);
   const [liveClock, setLiveClock] = useState("09:43:18");
@@ -123,6 +133,38 @@ export default function Home() {
   useEffect(() => {
     forkliftsRef.current = forklifts;
   }, [forklifts]);
+
+  useEffect(() => {
+    if (paused) return;
+    const timer = window.setInterval(() => {
+      setLivePositions((current) => {
+        const next = { ...current };
+        for (const forklift of forkliftsRef.current) {
+          if (forklift.status === "점검") continue;
+          const position = current[forklift.id] ?? [forklift.x, forklift.y];
+          const target = randomTargets[forklift.id] ?? position;
+          const dx = target[0] - position[0];
+          const dy = target[1] - position[1];
+          const distance = Math.hypot(dx, dy);
+          if (distance < 0.8) {
+            const candidates = (randomSafePoints[forklift.id] ?? []).filter((point) => {
+              if (point[0] === target[0] && point[1] === target[1]) return false;
+              return Object.entries(current).every(([otherId, otherPosition]) => otherId === forklift.id || Math.hypot(point[0] - otherPosition[0], point[1] - otherPosition[1]) > 7);
+            });
+            if (candidates.length) {
+              const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+              setRandomTargets((targets) => ({ ...targets, [forklift.id]: chosen }));
+            }
+            continue;
+          }
+          const step = Math.min(distance, 0.55 + Math.random() * 0.3);
+          next[forklift.id] = [position[0] + dx / distance * step, position[1] + dy / distance * step];
+        }
+        return next;
+      });
+    }, 200);
+    return () => window.clearInterval(timer);
+  }, [paused, randomTargets]);
 
   useEffect(() => {
     if (paused) return;
@@ -207,12 +249,8 @@ export default function Home() {
   }
 
   function positionFor(forklift: Forklift) {
-    const points = movementRoutes[forklift.id] ?? [[forklift.x, forklift.y]];
-    const scaled = simulationTime * points.length;
-    const index = Math.floor(scaled) % points.length;
-    const next = (index + 1) % points.length;
-    const amount = scaled - Math.floor(scaled);
-    return { left: `${points[index][0] + (points[next][0] - points[index][0]) * amount}%`, top: `${points[index][1] + (points[next][1] - points[index][1]) * amount}%` };
+    const position = livePositions[forklift.id] ?? [forklift.x, forklift.y];
+    return { left: `${position[0]}%`, top: `${position[1]}%` };
   }
 
   return (
