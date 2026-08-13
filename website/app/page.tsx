@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { createEcuDataSource } from "../lib/ecu/factory";
 import type { EcuSnapshot } from "../lib/ecu/types";
 import { evaluateDiagnostic, type DiagnosticReport } from "../lib/diagnostics/evaluator";
+import { answerQuestion, analyzeIncident, buildFleetReport, summarizeDrivingRecords, type TwinAiResult } from "../lib/twin-ai/analyzer";
+import { FleetReportModal, TwinAiPanel } from "./twin-ai-components";
 
 type Status = "정상" | "주의" | "점검";
 type Forklift = {
@@ -63,6 +65,7 @@ export default function Home() {
   const [speed, setSpeed] = useState(1);
   const [lastEvent, setLastEvent] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
+  const [showFleetReport, setShowFleetReport] = useState(false);
   const [simulationTime, setSimulationTime] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [liveRecords, setLiveRecords] = useState(drivingRecords);
@@ -74,10 +77,22 @@ export default function Home() {
   const liveRecordPulse = useRef(0);
   const forkliftsRef = useRef(forklifts);
   const [aiMessage, setAiMessage] = useState("Twin AI가 5대 장비의 상태를 분석 중입니다");
+  const [aiQuestion, setAiQuestion] = useState("");
+  const [aiQuestionError, setAiQuestionError] = useState("");
+  const [aiResult, setAiResult] = useState<TwinAiResult | null>(null);
   const ecuSource = useMemo(() => createEcuDataSource(), []);
   const selected = forklifts.find((forklift) => forklift.id === selectedId) ?? forklifts[0];
   const selectedEcu = ecuSnapshots[selected.id];
-  const selectedSnapshot: EcuSnapshot = selectedEcu ?? {
+  const selectedSnapshot: EcuSnapshot = selected.status === "점검" ? {
+    forkliftId: selected.id,
+    timestamp: new Date().toISOString(),
+    battery: selected.battery,
+    coolantTemperature: selected.coolantTemperature,
+    engineOilTemperature: selected.engineOilTemperature,
+    vibrationRms: selected.vibration,
+    mode: "DUMMY",
+    connected: true,
+  } : selectedEcu ?? {
     forkliftId: selected.id,
     timestamp: new Date().toISOString(),
     battery: selected.battery,
@@ -88,6 +103,14 @@ export default function Home() {
     connected: true,
   };
   const diagnostic = useMemo(() => evaluateDiagnostic(selectedSnapshot), [selectedSnapshot]);
+  const diagnostics = useMemo(() => Object.fromEntries(forklifts.map((forklift) => {
+    const ecu = ecuSnapshots[forklift.id];
+    const snapshot = forklift.status === "점검" ? { forkliftId: forklift.id, timestamp: new Date().toISOString(), battery: forklift.battery, coolantTemperature: forklift.coolantTemperature, engineOilTemperature: forklift.engineOilTemperature, vibrationRms: forklift.vibration, mode: "DUMMY" as const, connected: true } : ecu ?? { forkliftId: forklift.id, timestamp: new Date().toISOString(), battery: forklift.battery, coolantTemperature: forklift.coolantTemperature, engineOilTemperature: forklift.engineOilTemperature, vibrationRms: forklift.vibration, mode: "DUMMY" as const, connected: true };
+    return [forklift.id, evaluateDiagnostic(snapshot)];
+  })), [forklifts, ecuSnapshots]);
+  const aiContext = { forklifts, snapshots: ecuSnapshots, diagnostics, records: liveRecords, events: liveEvents };
+  const fleetAiReport = useMemo(() => buildFleetReport(forklifts, ecuSnapshots, liveRecords, liveEvents, diagnostics), [forklifts, ecuSnapshots, liveRecords, liveEvents, diagnostics]);
+  const recordAiSummary = useMemo(() => summarizeDrivingRecords(liveRecords, forklifts, liveEvents), [liveRecords, forklifts, liveEvents]);
 
   useEffect(() => {
     forkliftsRef.current = forklifts;
@@ -152,11 +175,21 @@ export default function Home() {
 
   function triggerRandomIncident(preferredId?: string) {
     const targetId = preferredId ?? forklifts[Math.floor(Math.random() * forklifts.length)].id;
+    const target = forklifts.find((forklift) => forklift.id === targetId) ?? forklifts[0];
+    const incidentSnapshot: EcuSnapshot = { forkliftId: targetId, timestamp: new Date().toISOString(), battery: Math.max(18, target.battery - 8), coolantTemperature: Math.max(101, target.coolantTemperature + 20), engineOilTemperature: Math.max(106, target.engineOilTemperature + 24), vibrationRms: Math.max(6.4, target.vibration + 3.2), mode: "DUMMY", connected: true };
+    const incidentDiagnostic = evaluateDiagnostic(incidentSnapshot);
     setForklifts((current) => current.map((forklift) => forklift.id === targetId ? { ...forklift, status: "점검", temperature: Math.max(82, forklift.temperature + 18 + Math.random() * 8), coolantTemperature: Math.max(101, forklift.coolantTemperature + 16 + Math.random() * 7), engineOilTemperature: Math.max(104, forklift.engineOilTemperature + 18 + Math.random() * 8), vibration: Math.max(6.2, forklift.vibration + 2.8 + Math.random() * 1.5), risk: "높음", task: "긴급 점검 대기" } : forklift));
     setSelectedId(targetId);
     setLastEvent(`09:43:02 · ${targetId} 이상 징후 랜덤 감지 · 점검 필요`);
     setLiveEvents((current) => [{ time: new Date().toLocaleTimeString("ko-KR", { hour12: false }), label: targetId, text: "이상 징후 감지 · 점검 필요", tone: "critical" }, ...current].slice(0, 8));
     setAiMessage(`Twin AI: ${targetId}의 온도·진동 패턴에서 이상 징후를 감지했습니다`);
+    setAiResult(analyzeIncident(target, incidentDiagnostic));
+  }
+
+  function submitAiQuestion() {
+    if (!aiQuestion.trim()) { setAiQuestionError("질문을 입력해 주세요."); return; }
+    setAiQuestionError("");
+    setAiResult(answerQuestion(aiQuestion, aiContext));
   }
 
   function formatTimer(seconds: number) {
@@ -207,7 +240,9 @@ export default function Home() {
 
       <section className="records-card panel"><div className="panel-header"><div><span className="section-kicker">DRIVING RECORDS</span><h2>실시간 운행기록</h2></div><span className="panel-meta"><span className="live-dot" /> LIVE · {liveClock}</span></div><div className="record-table-wrap"><table className="record-table"><thead><tr><th>시각</th><th>장비</th><th>운행 구간</th><th>현재 작업</th><th>상태</th><th>주행거리</th></tr></thead><tbody>{liveRecords.map((record) => <tr key={record[1]}><td>{record[0]}</td><td><b>{record[1]}</b></td><td>{record[2]}</td><td>{record[3]}</td><td><span className={`record-status status-${record[4]}`}>{record[4]}</span></td><td>{record[5]}</td></tr>)}</tbody></table></div></section>
       <footer className="footer-note"><span>포스코퓨처엠 스마트팩토리 운영 시스템</span><span>시연용 프로토타입 · 실제 센서 데이터가 아닌 시뮬레이션 데이터입니다</span></footer>
+      <TwinAiPanel report={fleetAiReport} diagnostics={diagnostics} result={aiResult} question={aiQuestion} error={aiQuestionError} onQuestionChange={setAiQuestion} onSubmit={submitAiQuestion} onQuickQuestion={(question, result) => { setAiQuestion(question); setAiResult(result); }} onFullReport={() => setShowFleetReport(true)} recordSummary={recordAiSummary} context={aiContext} />
       {showReport && <DiagnosticModal forkliftId={selected.id} report={diagnostic} onClose={() => setShowReport(false)} />}
+      {showFleetReport && <FleetReportModal report={fleetAiReport} recordSummary={recordAiSummary} onClose={() => setShowFleetReport(false)} />}
     </main>
   );
 }
