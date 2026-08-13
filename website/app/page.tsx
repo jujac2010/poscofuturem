@@ -50,14 +50,6 @@ const movementRoutes: Record<string, Array<[number, number]>> = {
   "P-05호": [[82, 54], [85, 50], [88, 46], [88, 46], [88, 46], [88, 46]],
 };
 
-const randomSafePoints: Record<string, Array<[number, number]>> = {
-  "P-01호": [[43, 70], [49, 67], [55, 64], [61, 60], [66, 57]],
-  "P-02호": [[17, 54], [22, 54], [27, 55]],
-  "P-03호": [[53, 27], [59, 26], [65, 27], [71, 30], [75, 33]],
-  "P-04호": [[42, 79], [49, 76], [57, 71], [65, 67], [73, 62], [78, 58]],
-  "P-05호": [[82, 54], [85, 50], [88, 46]],
-};
-
 const events = [
   { time: "09:42:18", label: "P-01호", text: "원료 야드 진입 · 정상 운행", tone: "normal" },
   { time: "09:41:53", label: "P-04호", text: "정비구역 대기 · 점검 권고 유지", tone: "warning" },
@@ -84,7 +76,7 @@ export default function Home() {
   const [showFleetReport, setShowFleetReport] = useState(false);
   const [simulationTime, setSimulationTime] = useState(0);
   const [livePositions, setLivePositions] = useState<Record<string, [number, number]>>(() => Object.fromEntries(initialForklifts.map((forklift) => [forklift.id, [forklift.x, forklift.y]])));
-  const [randomTargets, setRandomTargets] = useState<Record<string, [number, number]>>(() => Object.fromEntries(initialForklifts.map((forklift) => [forklift.id, randomSafePoints[forklift.id][0]])));
+  const [randomTargets, setRandomTargets] = useState<Record<string, [number, number]>>(() => Object.fromEntries(initialForklifts.map((forklift) => [forklift.id, [Math.max(12, Math.min(88, forklift.x + 10)), Math.max(18, Math.min(84, forklift.y + 5))]])));
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [liveRecords, setLiveRecords] = useState(drivingRecords);
   const [liveClock, setLiveClock] = useState("09:43:18");
@@ -140,21 +132,20 @@ export default function Home() {
       setLivePositions((current) => {
         const next = { ...current };
         for (const forklift of forkliftsRef.current) {
-          if (forklift.status === "점검") continue;
           const position = current[forklift.id] ?? [forklift.x, forklift.y];
           const target = randomTargets[forklift.id] ?? position;
           const dx = target[0] - position[0];
           const dy = target[1] - position[1];
           const distance = Math.hypot(dx, dy);
           if (distance < 0.8) {
-            const candidates = (randomSafePoints[forklift.id] ?? []).filter((point) => {
-              if (point[0] === target[0] && point[1] === target[1]) return false;
-              return Object.entries(current).every(([otherId, otherPosition]) => otherId === forklift.id || Math.hypot(point[0] - otherPosition[0], point[1] - otherPosition[1]) > 7);
-            });
-            if (candidates.length) {
-              const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-              setRandomTargets((targets) => ({ ...targets, [forklift.id]: chosen }));
+            // 고정 동선 없이 배치도 내부에서 새 목적지를 계속 생성합니다.
+            let chosen: [number, number] = [12 + Math.random() * 76, 18 + Math.random() * 66];
+            for (let attempt = 0; attempt < 8; attempt += 1) {
+              const candidate: [number, number] = [12 + Math.random() * 76, 18 + Math.random() * 66];
+              const clear = Object.entries(current).every(([otherId, otherPosition]) => otherId === forklift.id || Math.hypot(candidate[0] - otherPosition[0], candidate[1] - otherPosition[1]) > 6);
+              if (clear) { chosen = candidate; break; }
             }
+            setRandomTargets((targets) => ({ ...targets, [forklift.id]: chosen }));
             continue;
           }
           const step = Math.min(distance, 0.55 + Math.random() * 0.3);
@@ -263,7 +254,7 @@ export default function Home() {
 
       <section className="status-strip" aria-label="현장 요약"><div><span className="strip-label">운용 장비</span><strong>05 <small>대</small></strong></div><div><span className="strip-label">정상 운행</span><strong className="green">{stats.normal} <small>대</small></strong></div><div><span className="strip-label">주의 관찰</span><strong className="yellow">{stats.warning} <small>대</small></strong></div><div><span className="strip-label">점검 필요</span><strong className="red">{stats.check} <small>대</small></strong></div><div className="strip-note"><Icon>⌁</Icon> 마지막 데이터 수신 <b>2.4초 전</b></div></section>
 
-      <section className="control-bar"><div className="section-kicker"><span className="live-dot" /> Twin AI · 실시간 이동 시뮬레이션 <small className="motion-readout">5대 운행 · 경로 추적 중</small></div><div className="control-actions"><button className="incident-button" onClick={() => triggerRandomIncident()}><Icon>⚠</Icon> 랜덤 이상상황</button></div></section>
+      <section className="control-bar"><div className="section-kicker"><span className="live-dot" /> Twin AI · 실시간 무한 운행 <small className="motion-readout">5대 무한 주행 중</small></div><div className="control-actions"><button className="incident-button" onClick={() => triggerRandomIncident()}><Icon>⚠</Icon> 랜덤 이상상황</button></div></section>
 
       <section className="main-grid">
         <div className="map-card panel">

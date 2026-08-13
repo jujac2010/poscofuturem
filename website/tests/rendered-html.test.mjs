@@ -21,7 +21,7 @@ test("renders the forklift digital twin dashboard", async () => {
   for (const forklift of ["P-01호", "P-02호", "P-03호", "P-04호", "P-05호"]) {
     assert.match(html, new RegExp(forklift));
   }
-  assert.match(html, /실시간 이동 시뮬레이션/);
+  assert.match(html, /실시간 무한 운행/);
   assert.match(html, /data-moving="true"/);
   assert.match(html, /Twin AI/);
   assert.match(html, /랜덤 이상상황/);
