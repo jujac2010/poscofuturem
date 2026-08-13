@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { createEcuDataSource } from "../lib/ecu/factory";
 import type { EcuSnapshot } from "../lib/ecu/types";
 import { evaluateDiagnostic, type DiagnosticReport } from "../lib/diagnostics/evaluator";
@@ -36,6 +36,19 @@ const initialForklifts: Forklift[] = [
 
 // 현장 시연은 P-01호~P-05호 5대만 운행합니다.
 const OPERATING_FORKLIFT_COUNT = 5;
+
+const driveLanes: Record<string, { x: [number, number]; y: [number, number] }> = {
+  "P-01호": { x: [38, 68], y: [62, 70] },
+  "P-02호": { x: [14, 30], y: [46, 58] },
+  "P-03호": { x: [50, 78], y: [20, 34] },
+  "P-04호": { x: [38, 78], y: [78, 86] },
+  "P-05호": { x: [84, 92], y: [38, 62] },
+};
+
+function randomPointInLane(id: string): [number, number] {
+  const lane = driveLanes[id] ?? { x: [15, 85] as [number, number], y: [20, 84] as [number, number] };
+  return [lane.x[0] + Math.random() * (lane.x[1] - lane.x[0]), lane.y[0] + Math.random() * (lane.y[1] - lane.y[0])];
+}
 
 const movementRoutes: Record<string, Array<[number, number]>> = {
   // 중앙 대기·충전 → 오른쪽 통로
@@ -75,8 +88,8 @@ export default function Home() {
   const [showReport, setShowReport] = useState(false);
   const [showFleetReport, setShowFleetReport] = useState(false);
   const [simulationTime, setSimulationTime] = useState(0);
-  const [livePositions, setLivePositions] = useState<Record<string, [number, number]>>(() => Object.fromEntries(initialForklifts.map((forklift) => [forklift.id, [forklift.x, forklift.y]])));
-  const [randomTargets, setRandomTargets] = useState<Record<string, [number, number]>>(() => Object.fromEntries(initialForklifts.map((forklift) => [forklift.id, [Math.max(12, Math.min(88, forklift.x + 10)), Math.max(18, Math.min(84, forklift.y + 5))]])));
+  const [livePositions, setLivePositions] = useState<Record<string, [number, number]>>(() => Object.fromEntries(initialForklifts.map((forklift) => [forklift.id, randomPointInLane(forklift.id)])));
+  const [randomTargets, setRandomTargets] = useState<Record<string, [number, number]>>(() => Object.fromEntries(initialForklifts.map((forklift) => [forklift.id, randomPointInLane(forklift.id)])));
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [liveRecords, setLiveRecords] = useState(drivingRecords);
   const [liveClock, setLiveClock] = useState("09:43:18");
@@ -139,9 +152,9 @@ export default function Home() {
           const distance = Math.hypot(dx, dy);
           if (distance < 0.8) {
             // 고정 동선 없이 배치도 내부에서 새 목적지를 계속 생성합니다.
-            let chosen: [number, number] = [12 + Math.random() * 76, 18 + Math.random() * 66];
+            let chosen: [number, number] = randomPointInLane(forklift.id);
             for (let attempt = 0; attempt < 8; attempt += 1) {
-              const candidate: [number, number] = [12 + Math.random() * 76, 18 + Math.random() * 66];
+              const candidate = randomPointInLane(forklift.id);
               const clear = Object.entries(current).every(([otherId, otherPosition]) => otherId === forklift.id || Math.hypot(candidate[0] - otherPosition[0], candidate[1] - otherPosition[1]) > 6);
               if (clear) { chosen = candidate; break; }
             }
@@ -149,7 +162,9 @@ export default function Home() {
             continue;
           }
           const step = Math.min(distance, 0.55 + Math.random() * 0.3);
-          next[forklift.id] = [position[0] + dx / distance * step, position[1] + dy / distance * step];
+          const candidatePosition: [number, number] = [position[0] + dx / distance * step, position[1] + dy / distance * step];
+          const collision = Object.entries(current).some(([otherId, otherPosition]) => otherId !== forklift.id && Math.hypot(candidatePosition[0] - otherPosition[0], candidatePosition[1] - otherPosition[1]) < 5.5);
+          if (!collision) next[forklift.id] = candidatePosition;
         }
         return next;
       });
@@ -244,6 +259,12 @@ export default function Home() {
     return { left: `${position[0]}%`, top: `${position[1]}%` };
   }
 
+  function headingFor(forklift: Forklift) {
+    const position = livePositions[forklift.id] ?? [forklift.x, forklift.y];
+    const target = randomTargets[forklift.id] ?? position;
+    return `${Math.atan2(target[1] - position[1], target[0] - position[0]) * 180 / Math.PI}deg`;
+  }
+
   return (
     <main className="dashboard-shell">
       <header className="topbar">
@@ -263,7 +284,7 @@ export default function Home() {
             <div className="ai-overlay"><span className="ai-orb">✦</span><div><b>Twin AI</b><span>{aiMessage}</span></div></div>
             <div className="twin-scene" aria-hidden="true"><div className="scene-floor" /><div className="scene-wall wall-back" /><div className="scene-wall wall-right" /><div className="scene-light light-one" /><div className="scene-light light-two" /><div className="scene-rack rack-one"><i /><i /><i /></div><div className="scene-rack rack-two"><i /><i /><i /></div><div className="scene-charger charger-one" /><div className="scene-charger charger-two" /><div className="scene-zone-label label-yard">원료 야드</div><div className="scene-zone-label label-storage">저장동</div><div className="scene-zone-label label-shipping">출하장</div><div className="scene-zone-label label-charge">대기 충전</div></div>
             <div className="map-grid-lines" /><div className="north">N</div><div className="zone zone-yard"><span>원료 야드</span><small>RAW MATERIAL YARD</small></div><div className="zone zone-storage"><span>저장동</span><small>STORAGE BUILDING</small></div><div className="zone zone-shipping"><span>출하장</span><small>SHIPPING DOCK</small></div><div className="zone zone-maintenance"><span>정비구역</span><small>MAINTENANCE</small></div><div className="zone zone-charge"><span>대기 충전</span><small>CHARGE BAY</small></div><div className="road road-one" /><div className="road road-two" />
-            {forklifts.map((forklift) => <button key={forklift.id} data-moving="true" className={`forklift-marker status-${forklift.status}`} style={positionFor(forklift)} onClick={() => setSelectedId(forklift.id)} aria-label={`${forklift.id} 상세 보기`}><span className="motion-ring" /><img className="realistic-forklift" src="/forklift-realistic.png" alt="" /><span className="forklift-icon">▰</span><span className="marker-label">{forklift.id}</span><span className="tooltip"><b>{forklift.id}</b><span>{forklift.zone} · {forklift.status}</span><span>배터리 {Math.round(forklift.battery)}% · 모터 {Math.round(forklift.temperature)}°C</span><span className="tooltip-route">↗ {forklift.route}</span></span></button>)}
+            {forklifts.map((forklift) => <button key={forklift.id} data-moving="true" className={`forklift-marker status-${forklift.status}`} style={{ ...positionFor(forklift), "--heading": headingFor(forklift) } as CSSProperties} onClick={() => setSelectedId(forklift.id)} aria-label={`${forklift.id} 상세 보기`}><span className="motion-ring" /><img className="realistic-forklift" src="/forklift-realistic.png" alt="" /><span className="forklift-icon">▰</span><span className="marker-label">{forklift.id}</span><span className="tooltip"><b>{forklift.id}</b><span>{forklift.zone} · {forklift.status}</span><span>배터리 {Math.round(forklift.battery)}% · 모터 {Math.round(forklift.temperature)}°C</span><span className="tooltip-route">↗ 안전 주행 레인</span></span></button>)}
           </div>
           <div className="map-footer"><span><Icon>⌖</Icon> 현장 좌표 기준 · 2026.08.12</span><span>구역을 선택하면 장비 위치가 강조됩니다</span></div>
         </div>
