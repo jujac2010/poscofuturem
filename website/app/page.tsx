@@ -10,7 +10,8 @@ import { FleetReportModal, TwinAiPanel } from "./twin-ai-components";
 import { MaintenanceQueue } from "./maintenance-queue";
 import { ForkliftDetail } from "./forklift-detail";
 import { DataQualityPanel } from "./data-quality-panel";
-import type { CreateMaintenanceAction } from "../lib/maintenance/contracts";
+import type { CreateMaintenanceAction, MaintenanceAction } from "../lib/maintenance/contracts";
+import { applyMaintenanceAction, type MaintenanceUiAssessment } from "../lib/maintenance/ui-state";
 import type { RiskAssessmentRecord } from "../lib/risk/repository";
 import type { TelemetrySnapshot } from "../lib/telemetry/contracts";
 import type { SourceHealth } from "../lib/risk/contracts";
@@ -109,6 +110,7 @@ export default function Home() {
   const [forklifts, setForklifts] = useState(initialForklifts);
   const [selectedId, setSelectedId] = useState("P-03호");
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(maintenanceAssessment.id);
+  const [maintenanceAssessments, setMaintenanceAssessments] = useState<MaintenanceUiAssessment[]>([maintenanceAssessment]);
   const [paused, setPaused] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [lastEvent, setLastEvent] = useState<string | null>(null);
@@ -132,7 +134,7 @@ export default function Home() {
   const [aiResult, setAiResult] = useState<TwinAiResult | null>(null);
   const ecuSource = useMemo(() => createEcuDataSource(), []);
   const selected = forklifts.find((forklift) => forklift.id === selectedId) ?? forklifts[0];
-  const selectedAssessment = selectedAlertId === maintenanceAssessment.id ? maintenanceAssessment : null;
+  const selectedAssessment = maintenanceAssessments.find((assessment) => assessment.id === selectedAlertId) ?? null;
   const maintenanceSnapshot: TelemetrySnapshot = {
     assetId: ["FL", "04"].join("-"),
     observedAt: "2026-08-14T00:10:00.000Z",
@@ -305,9 +307,10 @@ export default function Home() {
     return { left: `${position[0]}%`, top: `${position[1]}%` };
   }
 
-  async function recordMaintenanceAction(input: CreateMaintenanceAction) {
+  async function recordMaintenanceAction(input: CreateMaintenanceAction, status: MaintenanceAction["status"]) {
     // Keep the selected alert mounted after the API confirms the action.
-    if (input.riskAssessmentId === maintenanceAssessment.id) setSelectedAlertId(input.riskAssessmentId);
+    setMaintenanceAssessments((current) => applyMaintenanceAction(current, input, status));
+    setSelectedAlertId(input.riskAssessmentId);
   }
 
   return (
@@ -339,7 +342,7 @@ export default function Home() {
 
       <section className="diagnostic-live-card panel"><div className="panel-header"><div><span className="section-kicker">LIVE DIAGNOSTICS</span><h2>실시간 상세 진단 리포트 · {selected.id}</h2></div><span className={`status-badge report-level-${diagnostic.level}`}>{diagnostic.level} · {diagnostic.score}점</span></div><div className="diagnostic-summary"><div><b>{diagnostic.summary}</b><span>ECU 4개 입력값을 학습 프로필과 비교한 현재 판정</span></div><div className="diagnostic-meta"><span>신뢰도 {diagnostic.confidence}%</span><span>우선순위 {diagnostic.priority}</span><span>{new Date(diagnostic.evaluatedAt).toLocaleTimeString("ko-KR", { hour12: false })} 갱신</span></div></div><div className="diagnostic-columns"><div className="diagnostic-findings"><h3>감지된 이상 징후</h3>{diagnostic.findings.map((finding) => <div className="finding-row" key={finding}><i className={`finding-dot report-level-${diagnostic.level}`} />{finding}</div>)}</div><div className="diagnostic-recommendation"><h3>정비 권고</h3><p>{diagnostic.recommendation}</p><small>판정 기준: 더미 학습 프로필 기반 시연용 평가 · 실제 ECU 연결 시 동일 로직 재사용</small></div></div></section>
 
-      <section className="maintenance-operations" aria-label="과열 정비 운영"><MaintenanceQueue assessments={[maintenanceAssessment]} selectedId={selectedAlertId} onSelect={(id) => setSelectedAlertId(id)} /><ForkliftDetail snapshot={maintenanceSnapshot} assessment={selectedAssessment} onSubmitAction={recordMaintenanceAction} /><DataQualityPanel health={maintenanceHealth} issues={[]} /></section>
+      <section className="maintenance-operations" aria-label="과열 정비 운영"><MaintenanceQueue assessments={maintenanceAssessments} selectedId={selectedAlertId} onSelect={(id) => setSelectedAlertId(id)} /><ForkliftDetail snapshot={maintenanceSnapshot} assessment={selectedAssessment} onSubmitAction={recordMaintenanceAction} /><DataQualityPanel health={maintenanceHealth} issues={[]} /></section>
 
       <section className="bottom-grid"><div className="fleet-card panel"><div className="panel-header"><div><span className="section-kicker">FLEET OVERVIEW</span><h2>전체 지게차 현황</h2></div><span className="panel-meta">5대 운용 중</span></div><div className="fleet-list">{forklifts.map((forklift) => <button key={forklift.id} className={`fleet-row ${selected.id === forklift.id ? "selected" : ""}`} onClick={() => setSelectedId(forklift.id)}><span className={`mini-vehicle status-${forklift.status}`}>▰</span><span className="fleet-id">{forklift.id}<small>{forklift.zone}</small></span><span className={`fleet-status status-${forklift.status}`}>{forklift.status}</span><span className="fleet-battery"><span className="battery-track"><i style={{ width: `${forklift.battery}%` }} /></span>{Math.round(forklift.battery)}%</span><span className="fleet-temp">{Math.round(forklift.temperature)}°C</span><span className="row-arrow">›</span></button>)}</div></div><div className="event-card panel"><div className="panel-header"><div><span className="section-kicker">EVENT LOG</span><h2>이벤트 로그</h2></div><span className="panel-meta"><span className="live-dot" /> LIVE</span></div><div className="event-list">{liveEvents.map((event, index) => <div className={`event-row ${event.tone === "critical" ? "event-critical" : ""}`} key={`${event.time}-${event.label}-${index}`}><span className="event-time">{event.time}</span><span className={`event-dot ${event.tone}`} /><span><b>{event.label}</b> {event.text}</span></div>)}</div></div></section>
 

@@ -1,12 +1,15 @@
 import type { RiskAssessmentRecord } from "../lib/risk/repository";
+import { applyMaintenanceAction, maintenanceDisplayStatus, type MaintenanceUiAssessment } from "../lib/maintenance/ui-state";
+
+export { applyMaintenanceAction };
 
 export type MaintenanceQueueProps = {
-  assessments: RiskAssessmentRecord[];
+  assessments: MaintenanceUiAssessment[];
   selectedId: string | null;
   onSelect: (id: string) => void;
 };
 
-const statusLabels: Record<RiskAssessmentRecord["status"], string> = {
+const statusLabels: Record<RiskAssessmentRecord["status"] | "IN_PROGRESS", string> = {
   OPEN: "OPEN",
   ACKNOWLEDGED: "ACKNOWLEDGED",
   IN_PROGRESS: "IN_PROGRESS",
@@ -22,7 +25,7 @@ export function MaintenanceQueue({ assessments, selectedId, onSelect }: Maintena
       {assessments.length === 0 && <p className="empty-state">현재 열린 정비 경보가 없습니다.</p>}
       {assessments.map((assessment) => <button type="button" key={assessment.id} className={`maintenance-row ${selectedId === assessment.id ? "selected" : ""}`} onClick={() => onSelect(assessment.id)} aria-pressed={selectedId === assessment.id}>
         <span className="maintenance-row-main"><strong>{assessment.assetId}</strong><span>{assessment.level} · {assessment.reasonKey}</span></span>
-        <span className={`action-status action-${assessment.status}`}>{statusLabels[assessment.status]}</span>
+        <span className={`action-status action-${maintenanceDisplayStatus(assessment)}`}>{statusLabels[maintenanceDisplayStatus(assessment)]}</span>
         <span className="maintenance-row-score">{assessment.score}점</span>
       </button>)}
     </div>

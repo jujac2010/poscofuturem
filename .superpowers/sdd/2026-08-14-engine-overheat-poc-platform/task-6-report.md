@@ -18,3 +18,18 @@
 - Full `npm run lint`: reports 21 pre-existing problems across legacy `page.tsx`, Twin AI, ECU, and repository files; the new components/tests introduce no lint errors.
 
 Task 7 was not changed.
+
+## Fix round 1
+
+- Fixed parent status propagation after successful maintenance POST/PATCH actions.
+- Kept `RiskAssessmentRecord.status` contract-safe: `IN_PROGRESS` is represented as `ACKNOWLEDGED` in the risk record and as `maintenanceStatus: IN_PROGRESS` for queue/detail display.
+- Added a shared state transition test proving queue/detail expose the same visible action status after an outcome.
+- Added a built-dashboard rendered HTML test verifying queue/detail expose the same initial status markup.
+
+## Fix round 1 verification
+
+- Focused maintenance tests: PASS, 46/46 matching project tests.
+- Full `npm test`: PASS, 46/46 tests.
+- `npm run build`: PASS.
+- Targeted lint for changed/new files excluding the pre-existing page diagnostics: PASS.
+- Full `npm run lint`: reports the same 21 pre-existing problems; no new lint errors from this fix.
