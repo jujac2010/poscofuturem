@@ -1,0 +1,17 @@
+{
+  "siteId": "site-01",
+  "intervalSeconds": 10,
+  "assets": [
+    {
+      "assetId": "FL-01",
+      "startObservedAt": "2026-08-14T00:10:00.000Z",
+      "receivedLagSeconds": 75,
+      "latitude": 35.1,
+      "longitude": 129.1,
+      "ambientTemperature": 31,
+      "samples": [
+        [0, 104, 101, 2280, 0.92, 4300, 3]
+      ]
+    }
+  ]
+}
