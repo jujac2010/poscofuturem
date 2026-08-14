@@ -15,4 +15,5 @@ export interface EcuDataSource {
   read(forkliftId: string): Promise<EcuSnapshot>;
 }
 
-export type { EcuAdapter, SourceHealth, SourceHealthStatus } from "../telemetry/adapters";
+export type { EcuAdapter } from "../telemetry/adapters";
+export type { SourceHealth } from "../risk/contracts.ts";

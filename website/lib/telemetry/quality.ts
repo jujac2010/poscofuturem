@@ -1,5 +1,6 @@
 import type { RawTelemetry, TelemetrySnapshot } from "./contracts.ts";
 import { TELEMETRY_STALE_THRESHOLD_MS, parseTimestamp } from "./adapters.ts";
+import { TELEMETRY_PHYSICAL_RANGES } from "./quality-ranges.ts";
 
 const telemetryFields = [
   "engineCoolantTemperature",
@@ -17,18 +18,6 @@ const requiredThermalFields = [
   "engineCoolantTemperature",
   "engineOilTemperature",
 ] as const;
-
-const physicalRanges: Record<(typeof telemetryFields)[number], { min: number; max: number }> = {
-  engineCoolantTemperature: { min: 0, max: 160 },
-  engineOilTemperature: { min: 0, max: 180 },
-  engineRpm: { min: 0, max: 8000 },
-  loadRate: { min: 0, max: 1 },
-  engineHours: { min: 0, max: 100_000 },
-  ambientTemperature: { min: -50, max: 80 },
-  latitude: { min: -90, max: 90 },
-  longitude: { min: -180, max: 180 },
-  speed: { min: 0, max: 120 },
-};
 
 function normalizeFieldValue(raw: RawTelemetry, field: (typeof telemetryFields)[number]): number | null {
   const value = raw.values[field];
@@ -48,7 +37,7 @@ function isFieldValid(field: (typeof telemetryFields)[number], value: number | n
     return false;
   }
 
-  const range = physicalRanges[field];
+  const range = TELEMETRY_PHYSICAL_RANGES[field];
   return value >= range.min && value <= range.max;
 }
 

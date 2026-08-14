@@ -7,6 +7,7 @@ export class FileReplayAdapter implements EcuAdapter {
   private cursor = 0;
   private connected = false;
   private lastObservedAt: string | null = null;
+  private lastReceivedAt: string | null = null;
 
   constructor(records: RawTelemetry[]) {
     this.records = records;
@@ -24,12 +25,18 @@ export class FileReplayAdapter implements EcuAdapter {
     const record = this.records[this.cursor];
     this.cursor += 1;
     this.lastObservedAt = record.observedAt;
+    this.lastReceivedAt = new Date().toISOString();
     return [record];
   }
 
   async health(referenceTime?: string): Promise<SourceHealth> {
-    const latestObservedAt = this.lastObservedAt ?? this.records.at(-1)?.observedAt ?? null;
-    return createSourceHealth("FILE_REPLAY", latestObservedAt, referenceTime);
+    return createSourceHealth(
+      this.connected,
+      "FILE_REPLAY",
+      this.lastObservedAt,
+      this.lastReceivedAt,
+      referenceTime,
+    );
   }
 
   async close(): Promise<void> {

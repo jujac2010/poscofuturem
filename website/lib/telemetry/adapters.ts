@@ -1,16 +1,7 @@
-import type { RawTelemetry, SourceType } from "./contracts";
+import type { SourceHealth } from "../risk/contracts.ts";
+import type { RawTelemetry, SourceType } from "./contracts.ts";
 
 export const TELEMETRY_STALE_THRESHOLD_MS = 60_000;
-
-export type SourceHealthStatus = "IDLE" | "READY" | "STALE";
-
-export type SourceHealth = {
-  sourceType: SourceType;
-  status: SourceHealthStatus;
-  lastObservedAt: string | null;
-  lagMs: number | null;
-  message: string;
-};
 
 export interface EcuAdapter {
   connect(): Promise<void>;
@@ -25,29 +16,43 @@ export function parseTimestamp(value: string): number | null {
 }
 
 export function createSourceHealth(
+  connected: boolean,
   sourceType: SourceType,
   lastObservedAt: string | null,
+  lastReceivedAt: string | null,
   referenceTime?: string,
 ): SourceHealth {
+  if (!connected) {
+    return {
+      sourceType,
+      status: "DISCONNECTED",
+      lastObservedAt,
+      lastReceivedAt,
+      message: "Telemetry source is disconnected.",
+    };
+  }
+
   if (lastObservedAt === null) {
     return {
       sourceType,
-      status: "IDLE",
+      status: "CONNECTED",
       lastObservedAt: null,
-      lagMs: null,
-      message: "No telemetry has been read yet.",
+      lastReceivedAt: null,
+      message: "Connected; no telemetry read yet.",
     };
   }
 
   const observedMs = parseTimestamp(lastObservedAt);
+  const effectiveReceivedAt = lastReceivedAt ?? referenceTime ?? null;
   const referenceMs = referenceTime ? parseTimestamp(referenceTime) : Date.now();
+  const receivedMs = effectiveReceivedAt ? parseTimestamp(effectiveReceivedAt) : null;
 
-  if (observedMs === null || referenceMs === null) {
+  if (observedMs === null || referenceMs === null || receivedMs === null) {
     return {
       sourceType,
-      status: "STALE",
+      status: "ERROR",
       lastObservedAt,
-      lagMs: null,
+      lastReceivedAt,
       message: "Telemetry source timestamps are invalid.",
     };
   }
@@ -57,9 +62,9 @@ export function createSourceHealth(
 
   return {
     sourceType,
-    status: stale ? "STALE" : "READY",
+    status: stale ? "STALE" : "CONNECTED",
     lastObservedAt,
-    lagMs,
-    message: stale ? "Telemetry source is stale." : "Telemetry source is healthy.",
+    lastReceivedAt: effectiveReceivedAt,
+    message: stale ? "Telemetry source is stale." : null,
   };
 }

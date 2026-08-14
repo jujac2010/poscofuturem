@@ -97,6 +97,57 @@ test("quality flags out of range and non-finite values as invalid", async () => 
   assert.equal(result.engineRpm, 1400);
 });
 
+test("quality accepts conservative default minimum and maximum boundary values", async () => {
+  const { normalizeRawTelemetry } = await import("../lib/telemetry/quality.ts");
+  const { TELEMETRY_PHYSICAL_RANGES } = await import("../lib/telemetry/quality-ranges.ts");
+  const result = normalizeRawTelemetry(
+    {
+      assetId: "P-01",
+      observedAt: "2026-08-14T00:00:00.000Z",
+      values: {
+        engineCoolantTemperature: TELEMETRY_PHYSICAL_RANGES.engineCoolantTemperature.min,
+        engineOilTemperature: TELEMETRY_PHYSICAL_RANGES.engineOilTemperature.max,
+        engineRpm: TELEMETRY_PHYSICAL_RANGES.engineRpm.max,
+        loadRate: TELEMETRY_PHYSICAL_RANGES.loadRate.min,
+        engineHours: TELEMETRY_PHYSICAL_RANGES.engineHours.max,
+        ambientTemperature: TELEMETRY_PHYSICAL_RANGES.ambientTemperature.min,
+        latitude: TELEMETRY_PHYSICAL_RANGES.latitude.max,
+        longitude: TELEMETRY_PHYSICAL_RANGES.longitude.min,
+        speed: TELEMETRY_PHYSICAL_RANGES.speed.max,
+      },
+      sourceType: "SIMULATOR",
+    },
+    "2026-08-14T00:00:01.000Z",
+  );
+
+  assert.equal(result.qualityStatus, "VALID");
+  assert.deepEqual(result.invalidFields, []);
+});
+
+test("quality rejects conservative default out of range values", async () => {
+  const { normalizeRawTelemetry } = await import("../lib/telemetry/quality.ts");
+  const { TELEMETRY_PHYSICAL_RANGES } = await import("../lib/telemetry/quality-ranges.ts");
+  const result = normalizeRawTelemetry(
+    {
+      assetId: "P-01",
+      observedAt: "2026-08-14T00:00:00.000Z",
+      values: {
+        engineCoolantTemperature: TELEMETRY_PHYSICAL_RANGES.engineCoolantTemperature.min - 1,
+        engineOilTemperature: TELEMETRY_PHYSICAL_RANGES.engineOilTemperature.max + 1,
+        engineRpm: 1400,
+      },
+      sourceType: "SIMULATOR",
+    },
+    "2026-08-14T00:00:01.000Z",
+  );
+
+  assert.equal(result.qualityStatus, "INVALID");
+  assert.deepEqual(result.invalidFields.sort(), [
+    "engineCoolantTemperature",
+    "engineOilTemperature",
+  ]);
+});
+
 test("quality returns invalid when timestamps are unparsable", async () => {
   const { normalizeRawTelemetry } = await import("../lib/telemetry/quality.ts");
   const result = normalizeRawTelemetry(
@@ -132,6 +183,41 @@ test("file replay reports stale source health after the last record", async () =
   const health = await adapter.health("2026-08-14T00:02:00.000Z");
 
   assert.equal(health.status, "STALE");
+});
+
+test("file replay health uses shared contract fields before any record is read", async () => {
+  const { FileReplayAdapter } = await import("../lib/telemetry/file-replay.ts");
+  const adapter = new FileReplayAdapter([
+    {
+      assetId: "P-01",
+      observedAt: "2026-08-14T00:00:00.000Z",
+      values: {},
+      sourceType: "FILE_REPLAY",
+    },
+  ]);
+
+  await adapter.connect();
+  const health = await adapter.health("2026-08-14T00:00:10.000Z");
+
+  assert.equal(health.status, "CONNECTED");
+  assert.equal(health.lastObservedAt, null);
+  assert.equal(health.lastReceivedAt, null);
+  assert.equal(health.message, "Connected; no telemetry read yet.");
+  assert.equal("lagMs" in health, false);
+});
+
+test("file replay health reports disconnected after close using shared contract", async () => {
+  const { FileReplayAdapter } = await import("../lib/telemetry/file-replay.ts");
+  const adapter = new FileReplayAdapter([]);
+
+  await adapter.connect();
+  await adapter.close();
+  const health = await adapter.health("2026-08-14T00:00:10.000Z");
+
+  assert.equal(health.status, "DISCONNECTED");
+  assert.equal(health.lastObservedAt, null);
+  assert.equal(health.lastReceivedAt, null);
+  assert.equal(health.message, "Telemetry source is disconnected.");
 });
 
 test("file replay emits records in constructor order before exhaustion", async () => {
