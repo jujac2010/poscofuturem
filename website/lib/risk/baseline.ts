@@ -1,3 +1,4 @@
+import type { RiskLevel } from "./contracts.ts";
 import type { TelemetrySnapshot } from "../telemetry/contracts.ts";
 import { parseTimestamp } from "../telemetry/adapters.ts";
 
@@ -9,6 +10,12 @@ export type BaselineProfile = {
   peerMedian: { coolant: number | null; oil: number | null };
   version: string;
   activeFrom: string;
+};
+
+export type BaselineRiskAssociation = {
+  assetId: string;
+  observedAt: string;
+  level: RiskLevel;
 };
 
 const BASELINE_VERSION = "baseline-v1";
@@ -114,11 +121,41 @@ function isCautionOrHigherCandidate(snapshot: TelemetrySnapshot): boolean {
   return thermalHigh || sustainedHotBand || highLoadHotPair;
 }
 
-function eligibleBaselineSamples(samples: TelemetrySnapshot[], assetId?: string) {
+function riskAssociationKey(assetId: string, observedAt: string) {
+  return `${assetId}@@${observedAt}`;
+}
+
+function excludedByAssociatedRisk(level: RiskLevel) {
+  return level === "CAUTION" || level === "MAINTENANCE_ALERT" || level === "DATA_ISSUE";
+}
+
+function createRiskAssociationIndex(riskAssociations: readonly BaselineRiskAssociation[] = []) {
+  return new Map(
+    riskAssociations.map((association) => [
+      riskAssociationKey(association.assetId, association.observedAt),
+      association.level,
+    ]),
+  );
+}
+
+function eligibleBaselineSamples(
+  samples: TelemetrySnapshot[],
+  riskAssociations: ReadonlyMap<string, RiskLevel>,
+  assetId?: string,
+) {
   return samples.filter((snapshot) => (
     (!assetId || snapshot.assetId === assetId)
     && isValidThermalSnapshot(snapshot)
-    && !isCautionOrHigherCandidate(snapshot)
+    && (
+      (() => {
+        const associatedRisk = riskAssociations.get(riskAssociationKey(snapshot.assetId, snapshot.observedAt));
+        if (associatedRisk) {
+          return !excludedByAssociatedRisk(associatedRisk);
+        }
+
+        return !isCautionOrHigherCandidate(snapshot);
+      })()
+    )
   ));
 }
 
@@ -127,11 +164,26 @@ export function buildBaselineProfile(
   samples: TelemetrySnapshot[],
   peerSamples: TelemetrySnapshot[],
   activeFrom: string,
+): BaselineProfile;
+export function buildBaselineProfile(
+  assetId: string,
+  samples: TelemetrySnapshot[],
+  peerSamples: TelemetrySnapshot[],
+  activeFrom: string,
+  riskAssociations: BaselineRiskAssociation[],
+): BaselineProfile;
+export function buildBaselineProfile(
+  assetId: string,
+  samples: TelemetrySnapshot[],
+  peerSamples: TelemetrySnapshot[],
+  activeFrom: string,
+  riskAssociations: BaselineRiskAssociation[] = [],
 ): BaselineProfile {
-  const baselineSamples = eligibleBaselineSamples(samples, assetId);
+  const riskAssociationIndex = createRiskAssociationIndex(riskAssociations);
+  const baselineSamples = eligibleBaselineSamples(samples, riskAssociationIndex, assetId);
   const coolantValues = baselineSamples.map((snapshot) => snapshot.engineCoolantTemperature as number);
   const oilValues = baselineSamples.map((snapshot) => snapshot.engineOilTemperature as number);
-  const peerEligible = eligibleBaselineSamples(peerSamples).filter((snapshot) => snapshot.assetId !== assetId);
+  const peerEligible = eligibleBaselineSamples(peerSamples, riskAssociationIndex).filter((snapshot) => snapshot.assetId !== assetId);
   const peerCoolantValues = peerEligible.map((snapshot) => snapshot.engineCoolantTemperature as number);
   const peerOilValues = peerEligible.map((snapshot) => snapshot.engineOilTemperature as number);
 

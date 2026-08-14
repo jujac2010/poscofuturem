@@ -201,19 +201,15 @@ function collectEvidence(input: OverheatEvaluationInput): EvidenceSignal[] {
 }
 
 function levelForEvidence(evidence: EvidenceSignal[], baseline: BaselineProfile): { level: RiskLevel; reasonKey: string } {
+  if (baseline.sampleCount < MAINTENANCE_READY_SAMPLE_COUNT) {
+    return { level: "OBSERVE", reasonKey: "LOW_CONFIDENCE_BASELINE" };
+  }
+
   const evidenceCount = evidence.length;
   const hasPersistence = evidence.some((signal) => signal.key === "persistence");
 
   if (evidenceCount === 0) {
     return { level: "NORMAL", reasonKey: "NO_OVERHEAT_SIGNALS" };
-  }
-
-  if (baseline.sampleCount < MAINTENANCE_READY_SAMPLE_COUNT) {
-    if (evidenceCount >= 2 && hasPersistence) {
-      return { level: "CAUTION", reasonKey: "LOW_CONFIDENCE_BASELINE" };
-    }
-
-    return { level: "OBSERVE", reasonKey: "LOW_CONFIDENCE_OBSERVE" };
   }
 
   if (evidenceCount >= 3 && hasPersistence) {

@@ -169,6 +169,37 @@ test("baseline builder excludes elevated and non-valid samples from the profile"
   assert.equal(baseline.peerMedian.oil, 78);
 });
 
+test("baseline builder excludes explicitly cautioned samples even below fallback heat thresholds", async () => {
+  const { buildBaselineProfile } = await import("../lib/risk/baseline.ts");
+
+  const coolNormalSamples = Array.from({ length: 19 }, (_, index) => validSnapshot({
+    observedAt: `2026-08-13T01:${String(index).padStart(2, "0")}:00.000Z`,
+    coolant: 80,
+    oil: 76,
+    rpm: 1450,
+    load: 0.4,
+  }));
+  const labeledCautionSample = validSnapshot({
+    observedAt: "2026-08-13T01:30:00.000Z",
+    coolant: 83,
+    oil: 79,
+    rpm: 1500,
+    load: 0.45,
+  });
+
+  const baseline = buildBaselineProfile(
+    "P-01",
+    [...coolNormalSamples, labeledCautionSample],
+    [],
+    "2026-08-14T00:00:00.000Z",
+    [{ assetId: "P-01", observedAt: "2026-08-13T01:30:00.000Z", level: "CAUTION" }],
+  );
+
+  assert.equal(baseline.sampleCount, 19);
+  assert.equal(baseline.coolant.median, 80);
+  assert.equal(baseline.oil.median, 76);
+});
+
 test("low-confidence baselines cannot escalate to maintenance alert", async () => {
   const { evaluateOverheatRisk } = await import("../lib/risk/overheat-evaluator.ts");
 
@@ -180,6 +211,6 @@ test("low-confidence baselines cannot escalate to maintenance alert", async () =
     now: "2026-08-14T00:10:00.000Z",
   });
 
-  assert.notEqual(result.level, "MAINTENANCE_ALERT");
+  assert.equal(result.level, "OBSERVE");
   assert.equal(result.shouldNotifyMaintenance, false);
 });
