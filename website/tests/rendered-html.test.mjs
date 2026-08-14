@@ -35,4 +35,9 @@ test("renders the forklift digital twin dashboard", async () => {
   assert.match(html, /냉각수 온도/);
   assert.match(html, /엔진오일 온도/);
   assert.doesNotMatch(html, /두산|Doosan/i);
+  assert.match(html, /정비 경보/);
+  assert.match(html, /향후 48시간 내 과열 위험 관찰 구간/);
+  assert.match(html, /경보 근거/);
+  assert.match(html, /점검 결과 기록/);
+  assert.match(html, /데이터 수신 상태/);
 });
