@@ -22,3 +22,11 @@ export function applyMaintenanceAction(
 export function maintenanceDisplayStatus(assessment: MaintenanceUiAssessment) {
   return assessment.maintenanceStatus ?? assessment.status;
 }
+
+export function maintenanceStatusView(assessment: MaintenanceUiAssessment) {
+  const status = maintenanceDisplayStatus(assessment);
+  return {
+    label: status,
+    className: `action-status action-${status}`,
+  };
+}

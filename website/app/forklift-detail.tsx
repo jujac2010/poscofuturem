@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { CreateMaintenanceAction, MaintenanceAction } from "../lib/maintenance/contracts";
 import type { TelemetrySnapshot } from "../lib/telemetry/contracts";
-import { maintenanceDisplayStatus, type MaintenanceUiAssessment } from "../lib/maintenance/ui-state";
+import { maintenanceStatusView, type MaintenanceUiAssessment } from "../lib/maintenance/ui-state";
 
 export type ForkliftDetailProps = {
   snapshot: TelemetrySnapshot | null;
@@ -49,7 +49,7 @@ export function ForkliftDetail({ snapshot, assessment, onSubmitAction }: Forklif
   if (!snapshot || !assessment) return <section className="forklift-detail panel" aria-label="지게차 정비 상세"><div className="panel-header"><h2>경보를 선택하세요</h2></div></section>;
 
   return <section className="forklift-detail panel" aria-label="지게차 정비 상세">
-    <div className="panel-header"><div><span className="section-kicker">MAINTENANCE DETAIL</span><h2>{assessment.assetId}</h2></div><span className={`action-status action-${saved ?? maintenanceDisplayStatus(assessment)}`}>{saved ?? maintenanceDisplayStatus(assessment)}</span></div>
+    <div className="panel-header"><div><span className="section-kicker">MAINTENANCE DETAIL</span><h2>{assessment.assetId}</h2></div><span className={saved ? `action-status action-${saved}` : maintenanceStatusView(assessment).className}>{saved ?? maintenanceStatusView(assessment).label}</span></div>
     <div className="evidence-panel"><h3>경보 근거</h3><p>{assessment.reasonKey}</p><ul>{assessment.evidence.map((item) => <li key={item}>{item}</li>)}</ul><small>관찰 구간: {assessment.observedWindow} · 신뢰도 {assessment.confidence}%</small></div>
     <div className="maintenance-metrics"><span>냉각수 <strong>{snapshot.engineCoolantTemperature ?? "-"}°C</strong></span><span>엔진오일 <strong>{snapshot.engineOilTemperature ?? "-"}°C</strong></span><span>부하율 <strong>{snapshot.loadRate === null ? "-" : `${Math.round(snapshot.loadRate * 100)}%`}</strong></span></div>
     <form className="action-form" onSubmit={submit}><h3>점검 결과 기록</h3><label>상태<select value={status} onChange={(event) => setStatus(event.target.value as ActionStatus)} disabled={pending}><option>ACKNOWLEDGED</option><option>IN_PROGRESS</option><option>COMPLETED</option></select></label><label>담당자<input value={assignee} onChange={(event) => setAssignee(event.target.value)} disabled={pending} /></label><label>조치 메모<textarea value={note} onChange={(event) => setNote(event.target.value)} disabled={pending} /></label>{error && <p className="inline-error" role="alert">{error}</p>}{saved && <p className="inline-success" role="status">{saved} 상태로 저장했습니다.</p>}<button className="report-button" type="submit" disabled={pending}>{pending ? "저장 중…" : "정비 조치 저장"}</button></form>

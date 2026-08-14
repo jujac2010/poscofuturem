@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { applyMaintenanceAction, maintenanceDisplayStatus } from "../lib/maintenance/ui-state.ts";
+import { applyMaintenanceAction, maintenanceDisplayStatus, maintenanceStatusView } from "../lib/maintenance/ui-state.ts";
 
 const appRoot = new URL("../app/", import.meta.url);
 const workerUrl = new URL("../dist/server/index.js", import.meta.url);
@@ -81,6 +81,35 @@ test("rendered queue and detail share the mapped status after an action outcome"
   assert.equal(updated[0].maintenanceStatus, "IN_PROGRESS");
   assert.equal(visibleQueueStatus, "IN_PROGRESS");
   assert.equal(visibleDetailStatus, "IN_PROGRESS");
+});
+
+test("all maintenance action outcomes map to contract-safe risk state and visible status", () => {
+  const assessment = {
+    id: "risk-statuses",
+    siteId: "site-01",
+    assetId: "FL-04",
+    level: "MAINTENANCE_ALERT",
+    score: 86,
+    confidence: 82,
+    evidence: ["sustained heat"],
+    observedWindow: "48h",
+    shouldNotifyMaintenance: true,
+    reasonKey: "sustained_multi_signal_overheat",
+    assessedAt: "2026-08-14T00:10:00.000Z",
+    status: "OPEN",
+    createdAt: "2026-08-14T00:10:00.000Z",
+    updatedAt: "2026-08-14T00:10:00.000Z",
+  };
+  const expectedRiskStatus = { ACKNOWLEDGED: "ACKNOWLEDGED", IN_PROGRESS: "ACKNOWLEDGED", COMPLETED: "COMPLETED" };
+
+  for (const actionStatus of Object.keys(expectedRiskStatus)) {
+    const updated = applyMaintenanceAction([assessment], { riskAssessmentId: assessment.id }, actionStatus);
+    const rendered = maintenanceStatusView(updated[0]);
+    assert.equal(updated[0].status, expectedRiskStatus[actionStatus]);
+    assert.equal(updated[0].maintenanceStatus, actionStatus);
+    assert.equal(rendered.label, actionStatus);
+    assert.equal(rendered.className, `action-status action-${actionStatus}`);
+  }
 });
 
 test("built dashboard renders the selected queue and detail status together", async () => {

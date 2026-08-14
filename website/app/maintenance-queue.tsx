@@ -1,5 +1,5 @@
 import type { RiskAssessmentRecord } from "../lib/risk/repository";
-import { applyMaintenanceAction, maintenanceDisplayStatus, type MaintenanceUiAssessment } from "../lib/maintenance/ui-state";
+import { applyMaintenanceAction, maintenanceStatusView, type MaintenanceUiAssessment } from "../lib/maintenance/ui-state";
 
 export { applyMaintenanceAction };
 
@@ -25,7 +25,7 @@ export function MaintenanceQueue({ assessments, selectedId, onSelect }: Maintena
       {assessments.length === 0 && <p className="empty-state">현재 열린 정비 경보가 없습니다.</p>}
       {assessments.map((assessment) => <button type="button" key={assessment.id} className={`maintenance-row ${selectedId === assessment.id ? "selected" : ""}`} onClick={() => onSelect(assessment.id)} aria-pressed={selectedId === assessment.id}>
         <span className="maintenance-row-main"><strong>{assessment.assetId}</strong><span>{assessment.level} · {assessment.reasonKey}</span></span>
-        <span className={`action-status action-${maintenanceDisplayStatus(assessment)}`}>{statusLabels[maintenanceDisplayStatus(assessment)]}</span>
+        <span className={maintenanceStatusView(assessment).className}>{statusLabels[maintenanceStatusView(assessment).label]}</span>
         <span className="maintenance-row-score">{assessment.score}점</span>
       </button>)}
     </div>

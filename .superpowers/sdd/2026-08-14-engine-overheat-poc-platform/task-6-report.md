@@ -33,3 +33,9 @@ Task 7 was not changed.
 - `npm run build`: PASS.
 - Targeted lint for changed/new files excluding the pre-existing page diagnostics: PASS.
 - Full `npm run lint`: reports the same 21 pre-existing problems; no new lint errors from this fix.
+
+## Fix round 2
+
+- Expanded shared state/display regression coverage for `ACKNOWLEDGED`, `IN_PROGRESS`, and `COMPLETED` outcomes.
+- Asserted `IN_PROGRESS` remains risk `ACKNOWLEDGED`, while `COMPLETED` maps to risk `COMPLETED`.
+- Added a rendered completed-state assertion for the shared `action-status action-COMPLETED` view.
