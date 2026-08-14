@@ -17,6 +17,7 @@ export type RawTelemetry = {
   assetId: string;
   observedAt: string;
   values: Record<string, number | null>;
+  units?: Partial<Record<string, "fraction" | "percent" | "celsius" | "rpm" | "hours" | "degrees" | "km/h">>;
   sourceType: SourceType;
   payloadHash?: string;
 };

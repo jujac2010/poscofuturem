@@ -14,3 +14,5 @@ export type EcuSnapshot = {
 export interface EcuDataSource {
   read(forkliftId: string): Promise<EcuSnapshot>;
 }
+
+export type { EcuAdapter, SourceHealth, SourceHealthStatus } from "../telemetry/adapters";
