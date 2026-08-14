@@ -38,3 +38,31 @@ test("telemetry contract preserves measurement and quality metadata", async () =
   assert.deepEqual(snapshot.missingFields, []);
   assert.deepEqual(snapshot.invalidFields, []);
 });
+
+test("telemetry contract keeps valid thermal snapshots valid when optional fields are missing", async () => {
+  const { createTelemetrySnapshot } = await import("../lib/telemetry/contracts.ts");
+  const snapshot = createTelemetrySnapshot({
+    assetId: "P-02",
+    observedAt: "2026-08-14T00:10:00.000Z",
+    receivedAt: "2026-08-14T00:10:01.000Z",
+    engineCoolantTemperature: 84,
+    engineOilTemperature: 81,
+    engineRpm: null,
+    loadRate: null,
+    engineHours: null,
+    ambientTemperature: null,
+    latitude: null,
+    longitude: null,
+    speed: null,
+    sourceType: "SIMULATOR",
+  });
+
+  assert.equal(snapshot.qualityStatus, "VALID");
+  assert.ok(snapshot.missingFields.includes("engineRpm"));
+  assert.ok(snapshot.missingFields.includes("loadRate"));
+  assert.ok(snapshot.missingFields.includes("engineHours"));
+  assert.ok(snapshot.missingFields.includes("ambientTemperature"));
+  assert.ok(snapshot.missingFields.includes("latitude"));
+  assert.ok(snapshot.missingFields.includes("longitude"));
+  assert.ok(snapshot.missingFields.includes("speed"));
+});

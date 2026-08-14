@@ -66,6 +66,11 @@ const telemetryValueFields = [
   "speed",
 ] as const;
 
+const thermalValueFields = [
+  "engineCoolantTemperature",
+  "engineOilTemperature",
+] as const;
+
 type TelemetryInput = Omit<TelemetrySnapshot, "qualityStatus" | "missingFields" | "invalidFields">;
 
 const isFiniteNumber = (value: number | null): value is number => typeof value === "number" && Number.isFinite(value);
@@ -76,9 +81,13 @@ export function createTelemetrySnapshot(input: TelemetryInput): TelemetrySnapsho
     const value = input[field];
     return value !== null && !isFiniteNumber(value);
   });
+  const thermalFieldsPresent = thermalValueFields.every((field) => {
+    const value = input[field];
+    return value !== null && isFiniteNumber(value);
+  });
 
   const qualityStatus: QualityStatus =
-    invalidFields.length > 0 ? "INVALID" : missingFields.length > 0 ? "PARTIAL" : "VALID";
+    invalidFields.length > 0 ? "INVALID" : thermalFieldsPresent ? "VALID" : "PARTIAL";
 
   return {
     ...input,
