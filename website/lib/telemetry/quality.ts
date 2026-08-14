@@ -94,6 +94,7 @@ export function normalizeRawTelemetry(raw: RawTelemetry, receivedAt: string): Te
     assetId: raw.assetId,
     observedAt: raw.observedAt,
     receivedAt,
+    payloadHash: raw.payloadHash,
     engineCoolantTemperature: normalized.engineCoolantTemperature,
     engineOilTemperature: normalized.engineOilTemperature,
     engineRpm: normalized.engineRpm,

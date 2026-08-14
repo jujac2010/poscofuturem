@@ -26,6 +26,7 @@ export type TelemetrySnapshot = {
   assetId: string;
   observedAt: string;
   receivedAt: string;
+  payloadHash?: string;
   engineCoolantTemperature: number | null;
   engineOilTemperature: number | null;
   engineRpm: number | null;

@@ -1,5 +1,8 @@
 import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
+// These D1 tables store normalized operational telemetry and maintenance records.
+// Raw one-second payload bodies remain outside the operational tables; only the
+// upstream payload hash (or an explicit normalized fallback hash) is stored here.
 export const telemetrySnapshots = sqliteTable("telemetrySnapshots", {
   id: text("id").primaryKey(),
   payloadHash: text("payload_hash").notNull(),

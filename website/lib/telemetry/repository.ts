@@ -19,7 +19,7 @@ export type D1DatabaseLike = {
 
 type StoredTelemetrySnapshot = TelemetrySnapshot & {
   id: string;
-  payloadHash: string;
+  resolvedPayloadHash: string;
 };
 
 type StoredTelemetryAggregate = TelemetryAggregate & {
@@ -33,6 +33,7 @@ export type InMemoryTelemetryStore = {
 };
 
 type TelemetrySnapshotRow = {
+  payload_hash: string;
   asset_id: string;
   observed_at: string;
   received_at: string;
@@ -81,8 +82,17 @@ function createHash(value: unknown) {
   return hashString(stableStringify(value));
 }
 
-function createSnapshotId(snapshot: TelemetrySnapshot) {
-  return `telemetry_snapshot_${createHash(snapshot)}`;
+function fallbackSnapshotPayloadHash(snapshot: TelemetrySnapshot) {
+  const { payloadHash: _payloadHash, ...normalizedSnapshot } = snapshot;
+  return `normalized_snapshot_${createHash(normalizedSnapshot)}`;
+}
+
+function resolvedSnapshotPayloadHash(snapshot: TelemetrySnapshot) {
+  return snapshot.payloadHash ?? fallbackSnapshotPayloadHash(snapshot);
+}
+
+function createSnapshotId(snapshot: TelemetrySnapshot, payloadHash: string) {
+  return `telemetry_snapshot_${payloadHash}`;
 }
 
 function createAggregateId(aggregate: TelemetryAggregate) {
@@ -102,10 +112,12 @@ function compareObservedAtDesc(left: { observedAt: string }, right: { observedAt
 }
 
 function snapshotToStored(snapshot: TelemetrySnapshot): StoredTelemetrySnapshot {
+  const payloadHash = resolvedSnapshotPayloadHash(snapshot);
   return {
     ...snapshot,
-    id: createSnapshotId(snapshot),
-    payloadHash: createHash(snapshot),
+    payloadHash,
+    id: createSnapshotId(snapshot, payloadHash),
+    resolvedPayloadHash: payloadHash,
   };
 }
 
@@ -119,6 +131,7 @@ function aggregateToStored(input: TelemetryAggregate): StoredTelemetryAggregate 
 
 function snapshotRowToDomain(row: TelemetrySnapshotRow): TelemetrySnapshot {
   return {
+    payloadHash: row.payload_hash,
     assetId: row.asset_id,
     observedAt: row.observed_at,
     receivedAt: row.received_at,
@@ -156,7 +169,7 @@ export function createInMemoryTelemetryRepository(
   return {
     async insertSnapshot(snapshot) {
       const stored = snapshotToStored(snapshot);
-      const existingIndex = store.snapshots.findIndex((entry) => entry.payloadHash === stored.payloadHash);
+      const existingIndex = store.snapshots.findIndex((entry) => entry.resolvedPayloadHash === stored.resolvedPayloadHash);
       if (existingIndex >= 0) {
         store.snapshots[existingIndex] = stored;
         return;
@@ -181,7 +194,7 @@ export function createInMemoryTelemetryRepository(
         .filter((entry) => entry.assetId === assetId)
         .sort(compareObservedAtDesc)
         .slice(0, normalizeLimit(limit))
-        .map(({ id: _id, payloadHash: _payloadHash, ...snapshot }) => snapshot);
+        .map(({ id: _id, resolvedPayloadHash: _resolvedPayloadHash, ...snapshot }) => snapshot);
     },
   };
 }
@@ -191,6 +204,9 @@ export function createD1TelemetryRepository(database: D1DatabaseLike): Telemetry
     async insertSnapshot(snapshot) {
       const stored = snapshotToStored(snapshot);
 
+      // Operational snapshots are normalized records for recent telemetry access.
+      // Raw one-second payload bodies remain outside D1; only the upstream hash
+      // (or an explicit normalized-content fallback hash) is persisted here.
       await database.prepare(
         `insert into telemetrySnapshots (
           id,
@@ -230,7 +246,7 @@ export function createD1TelemetryRepository(database: D1DatabaseLike): Telemetry
           invalid_fields_json = excluded.invalid_fields_json`,
       ).bind(
         stored.id,
-        stored.payloadHash,
+        stored.resolvedPayloadHash,
         stored.assetId,
         stored.observedAt,
         stored.receivedAt,
@@ -302,6 +318,7 @@ export function createD1TelemetryRepository(database: D1DatabaseLike): Telemetry
       const rows = await allRows<TelemetrySnapshotRow>(
         database,
         `select
+          payload_hash,
           asset_id,
           observed_at,
           received_at,
