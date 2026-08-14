@@ -3,7 +3,7 @@ import { evaluateOverheatRisk } from "../risk/overheat-evaluator.ts";
 import type { MaintenanceAction, MaintenanceOutcome, CreateMaintenanceAction } from "../maintenance/contracts.ts";
 import type { MaintenanceRepository } from "../maintenance/repository.ts";
 import type { RiskAssessmentRecord, RiskRepository } from "../risk/repository.ts";
-import { createTelemetrySnapshot, type DataQuality, type RawTelemetry, type TelemetryAggregate, type TelemetrySnapshot } from "./contracts.ts";
+import type { DataQuality, RawTelemetry, TelemetryAggregate, TelemetrySnapshot } from "./contracts.ts";
 import type { TelemetryRepository } from "./repository.ts";
 import { normalizeRawTelemetry } from "./quality.ts";
 import { parseTimestamp } from "./adapters.ts";
@@ -15,9 +15,11 @@ const VALID_SOURCE_TYPES = new Set(["SIMULATOR", "FILE_REPLAY", "CAN", "MQTT", "
 const VALID_MAINTENANCE_STATUSES = new Set(["ACKNOWLEDGED", "IN_PROGRESS", "COMPLETED"]);
 const HISTORY_LIMIT = 60;
 const DEFAULT_NOW = () => new Date().toISOString();
+export const PERSISTENCE_UNAVAILABLE_MESSAGE = "Persistence temporarily unavailable.";
+export const UNEXPECTED_ERROR_MESSAGE = "Unexpected server error.";
 
 export class PersistenceUnavailableError extends Error {
-  constructor(message = "Operational persistence is unavailable.") {
+  constructor(message = PERSISTENCE_UNAVAILABLE_MESSAGE) {
     super(message);
     this.name = "PersistenceUnavailableError";
   }
@@ -45,51 +47,13 @@ function nowFrom(dependencies: WorkflowDependencies) {
   return dependencies.now ?? DEFAULT_NOW;
 }
 
-function createSeedSnapshot(assetId: string, observedAt: string, index: number): TelemetrySnapshot {
-  const offset = (index % 3) - 1;
-  return createTelemetrySnapshot({
-    assetId,
-    observedAt,
-    receivedAt: observedAt,
-    engineCoolantTemperature: 82 + offset,
-    engineOilTemperature: 78 + offset,
-    engineRpm: 1480 + (index * 10),
-    loadRate: 0.42 + ((index % 4) * 0.03),
-    engineHours: 4200 + (index * 0.1),
-    ambientTemperature: 31,
-    latitude: 35.1,
-    longitude: 129.1,
-    speed: 4,
-    sourceType: "SIMULATOR",
-  });
-}
-
-function buildSeededBaseline(
+function buildHistoryBaseline(
   assetId: string,
   history: TelemetrySnapshot[],
   now: string,
-  assetIds: readonly string[],
 ): BaselineProfile {
-  const referenceMs = parseTimestamp(now) ?? Date.now();
-  const seededSamples = Array.from({ length: 24 }, (_, index) => {
-    const observedAt = new Date(referenceMs - ((24 - index) * 60 * 60 * 1000)).toISOString();
-    return createSeedSnapshot(assetId, observedAt, index);
-  });
-  const peerSamples = assetIds
-    .filter((candidate) => candidate !== assetId)
-    .flatMap((candidate, assetOffset) =>
-      Array.from({ length: 6 }, (_, index) => {
-        const observedAt = new Date(referenceMs - ((6 - index) * 60 * 60 * 1000)).toISOString();
-        return createTelemetrySnapshot({
-          ...createSeedSnapshot(candidate, observedAt, index + assetOffset),
-          assetId: candidate,
-        });
-      })
-    );
-  const allSamples = [...seededSamples, ...history];
-  const activeFrom = seededSamples[0]?.observedAt ?? now;
-
-  return buildBaselineProfile(assetId, allSamples, peerSamples, activeFrom);
+  const activeFrom = history[0]?.observedAt ?? now;
+  return buildBaselineProfile(assetId, history, [], activeFrom);
 }
 
 function aggregateFromSnapshots(
@@ -179,6 +143,10 @@ export function isPersistenceUnavailableError(error: unknown): error is Persiste
   return error instanceof PersistenceUnavailableError;
 }
 
+function toPersistenceUnavailableError() {
+  return new PersistenceUnavailableError();
+}
+
 export function setWorkflowDependenciesForTests(dependencies: WorkflowDependencies | null) {
   workflowDependenciesOverride = dependencies;
 }
@@ -205,20 +173,27 @@ export async function resolveWorkflowDependencies(): Promise<WorkflowDependencie
       maintenanceRepository: maintenanceRepositoryModule.createD1MaintenanceRepository(database),
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Operational persistence is unavailable.";
-    throw new PersistenceUnavailableError(message);
+    throw toPersistenceUnavailableError(error);
   }
 }
 
 export async function listOpenAssessments(siteId: string, dependencies: WorkflowDependencies): Promise<RiskAssessmentRecord[]> {
-  return dependencies.riskRepository.listOpen(siteId);
+  try {
+    return await dependencies.riskRepository.listOpen(siteId);
+  } catch (error) {
+    throw toPersistenceUnavailableError(error);
+  }
 }
 
 export async function createMaintenanceAction(
   input: CreateMaintenanceAction,
   dependencies: WorkflowDependencies,
 ): Promise<MaintenanceAction> {
-  return dependencies.maintenanceRepository.createAction(input);
+  try {
+    return await dependencies.maintenanceRepository.createAction(input);
+  } catch (error) {
+    throw toPersistenceUnavailableError(error);
+  }
 }
 
 export async function completeMaintenanceAction(
@@ -226,7 +201,15 @@ export async function completeMaintenanceAction(
   outcome: MaintenanceOutcome,
   dependencies: WorkflowDependencies,
 ): Promise<MaintenanceAction> {
-  return dependencies.maintenanceRepository.completeAction(id, outcome);
+  try {
+    return await dependencies.maintenanceRepository.completeAction(id, outcome);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("not found")) {
+      throw error;
+    }
+
+    throw toPersistenceUnavailableError(error);
+  }
 }
 
 export async function ingestTelemetry(
@@ -243,38 +226,42 @@ export async function ingestTelemetry(
     const snapshot = normalizeTelemetryRecord(record, receivedAt);
 
     if (snapshot.qualityStatus === "VALID") {
-      await dependencies.telemetryRepository.insertSnapshot(snapshot);
-      accepted += 1;
+      try {
+        await dependencies.telemetryRepository.insertSnapshot(snapshot);
+        accepted += 1;
 
-      const recentSnapshots = await dependencies.telemetryRepository.listRecent(snapshot.assetId, HISTORY_LIMIT);
-      const orderedSnapshots = [...recentSnapshots].sort((left, right) => left.observedAt.localeCompare(right.observedAt));
-      const history = orderedSnapshots.filter((candidate) =>
-        candidate.observedAt !== snapshot.observedAt || candidate.payloadHash !== snapshot.payloadHash
-      );
+        const recentSnapshots = await dependencies.telemetryRepository.listRecent(snapshot.assetId, HISTORY_LIMIT);
+        const orderedSnapshots = [...recentSnapshots].sort((left, right) => left.observedAt.localeCompare(right.observedAt));
+        const history = orderedSnapshots.filter((candidate) =>
+          candidate.observedAt !== snapshot.observedAt || candidate.payloadHash !== snapshot.payloadHash
+        );
 
-      await dependencies.telemetryRepository.insertAggregate(
-        aggregateFromSnapshots(snapshot.assetId, orderedSnapshots, snapshot, 10),
-      );
-      await dependencies.telemetryRepository.insertAggregate(
-        aggregateFromSnapshots(snapshot.assetId, orderedSnapshots, snapshot, 60),
-      );
+        await dependencies.telemetryRepository.insertAggregate(
+          aggregateFromSnapshots(snapshot.assetId, orderedSnapshots, snapshot, 10),
+        );
+        await dependencies.telemetryRepository.insertAggregate(
+          aggregateFromSnapshots(snapshot.assetId, orderedSnapshots, snapshot, 60),
+        );
 
-      const baseline = (dependencies.buildBaseline ?? buildSeededBaseline)(
-        snapshot.assetId,
-        history,
-        receivedAt,
-        dependencies.assetIds,
-      );
-      const assessment = evaluateOverheatRisk({
-        current: snapshot,
-        history,
-        peerSnapshots: [],
-        baseline,
-        now: receivedAt,
-      });
+        const baseline = (dependencies.buildBaseline ?? buildHistoryBaseline)(
+          snapshot.assetId,
+          history,
+          receivedAt,
+          dependencies.assetIds,
+        );
+        const assessment = evaluateOverheatRisk({
+          current: snapshot,
+          history,
+          peerSnapshots: [],
+          baseline,
+          now: receivedAt,
+        });
 
-      if (assessment.shouldNotifyMaintenance) {
-        await dependencies.riskRepository.openOrUpdateAssessment(assessment);
+        if (assessment.shouldNotifyMaintenance) {
+          await dependencies.riskRepository.openOrUpdateAssessment(assessment);
+        }
+      } catch (error) {
+        throw toPersistenceUnavailableError(error);
       }
 
       continue;

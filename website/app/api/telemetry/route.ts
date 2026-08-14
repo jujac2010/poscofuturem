@@ -3,16 +3,17 @@ import {
   isKnownAssetId,
   isPersistenceUnavailableError,
   isTelemetryRequestRecord,
+  PERSISTENCE_UNAVAILABLE_MESSAGE,
   resolveWorkflowDependencies,
+  UNEXPECTED_ERROR_MESSAGE,
 } from "../../../lib/telemetry/ingest.ts";
 
 function badRequest(error: string) {
   return Response.json({ error }, { status: 400 });
 }
 
-function serviceUnavailable(error: unknown) {
-  const message = error instanceof Error ? error.message : "Operational persistence is unavailable.";
-  return Response.json({ error: message }, { status: 503 });
+function serviceUnavailable() {
+  return Response.json({ error: PERSISTENCE_UNAVAILABLE_MESSAGE }, { status: 503 });
 }
 
 export async function POST(request: Request) {
@@ -39,13 +40,13 @@ export async function POST(request: Request) {
     return Response.json(result);
   } catch (error) {
     if (isPersistenceUnavailableError(error)) {
-      return serviceUnavailable(error);
+      return serviceUnavailable();
     }
 
     if (error instanceof SyntaxError) {
       return badRequest("request body must be valid JSON");
     }
 
-    return Response.json({ error: error instanceof Error ? error.message : "Unexpected error" }, { status: 500 });
+    return Response.json({ error: UNEXPECTED_ERROR_MESSAGE }, { status: 500 });
   }
 }

@@ -1,6 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+function makeSyntheticAlertBaseline(assetId) {
+  return {
+    assetId,
+    sampleCount: 24,
+    coolant: { median: 82, upperBound: 88, riseRatePerMinute: 2.5 },
+    oil: { median: 78, upperBound: 84, riseRatePerMinute: 2.1 },
+    peerMedian: { coolant: 82, oil: 78 },
+    version: "baseline-v1",
+    activeFrom: "2026-08-01T00:00:00.000Z",
+  };
+}
+
 function makeTelemetryRecord({
   assetId = "FL-01",
   observedAt,
@@ -66,6 +78,7 @@ test("workflow telemetry ingestion opens one deduplicated maintenance alert and 
     riskRepository: createInMemoryRiskRepository({ siteId: "site-01" }, riskStore),
     maintenanceRepository: createInMemoryMaintenanceRepository({ now }),
     now,
+    buildBaseline: (assetId) => makeSyntheticAlertBaseline(assetId),
   });
   t.after(() => setWorkflowDependenciesForTests(null));
 
@@ -211,6 +224,7 @@ test("workflow telemetry ingestion opens one deduplicated maintenance alert and 
   assert.equal(staleBody.rejected, 1);
   assert.equal(staleBody.qualityIssues.length, 1);
   assert.equal(staleBody.qualityIssues[0].status, "STALE");
+  assert.match(staleBody.qualityIssues[0].message, /risk escalation is suppressed/i);
 
   const finalRiskResponse = await getRisks(new Request("http://localhost/api/risks?siteId=site-01&status=open"));
   const finalRiskBody = await finalRiskResponse.json();
@@ -218,7 +232,79 @@ test("workflow telemetry ingestion opens one deduplicated maintenance alert and 
   assert.equal(finalRiskBody.assessments[0].id, firstOpenBody.assessments[0].id);
 });
 
-test("workflow routes validate malformed requests and report unavailable persistence", async (t) => {
+test("workflow ingestion does not escalate to maintenance alert without actual baseline history", async (t) => {
+  const { createInMemoryTelemetryRepository } = await import("../lib/telemetry/repository.ts");
+  const { createInMemoryRiskRepository, createInMemoryRiskStore } = await import("../lib/risk/repository.ts");
+  const { createInMemoryMaintenanceRepository } = await import("../lib/maintenance/repository.ts");
+  const { setWorkflowDependenciesForTests } = await import("../lib/telemetry/ingest.ts");
+  const { POST: postTelemetry } = await import("../app/api/telemetry/route.ts");
+  const { GET: getRisks } = await import("../app/api/risks/route.ts");
+
+  const riskStore = createInMemoryRiskStore();
+
+  setWorkflowDependenciesForTests({
+    siteId: "site-01",
+    assetIds: ["FL-01", "FL-02", "FL-03", "FL-04", "FL-05"],
+    telemetryRepository: createInMemoryTelemetryRepository(),
+    riskRepository: createInMemoryRiskRepository({ siteId: "site-01" }, riskStore),
+    maintenanceRepository: createInMemoryMaintenanceRepository({
+      now: () => "2026-08-14T00:00:00.000Z",
+    }),
+    now: (() => {
+      const values = [
+        "2026-08-14T00:08:01.000Z",
+        "2026-08-14T00:09:01.000Z",
+        "2026-08-14T00:10:01.000Z",
+      ];
+      return () => values.shift() ?? "2026-08-14T00:10:01.000Z";
+    })(),
+  });
+  t.after(() => setWorkflowDependenciesForTests(null));
+
+  const hotSequenceResponse = await postTelemetry(jsonRequest("http://localhost/api/telemetry", {
+    records: [
+      makeTelemetryRecord({
+        observedAt: "2026-08-14T00:08:00.000Z",
+        coolant: 94,
+        oil: 92,
+        rpm: 2050,
+        load: 0.84,
+        payloadHash: "history-hot-001",
+      }),
+      makeTelemetryRecord({
+        observedAt: "2026-08-14T00:09:00.000Z",
+        coolant: 99,
+        oil: 97,
+        rpm: 2180,
+        load: 0.88,
+        payloadHash: "history-hot-002",
+      }),
+      makeTelemetryRecord({
+        observedAt: "2026-08-14T00:10:00.000Z",
+        coolant: 104,
+        oil: 102,
+        rpm: 2310,
+        load: 0.92,
+        payloadHash: "history-hot-003",
+      }),
+    ],
+  }));
+
+  assert.equal(hotSequenceResponse.status, 200);
+  assert.deepEqual(await hotSequenceResponse.json(), {
+    accepted: 3,
+    rejected: 0,
+    qualityIssues: [],
+  });
+
+  const riskResponse = await getRisks(new Request("http://localhost/api/risks?siteId=site-01&status=open"));
+  const riskBody = await riskResponse.json();
+  assert.equal(riskResponse.status, 200);
+  assert.equal(riskBody.assessments.length, 0);
+  assert.equal(riskStore.assessments.length, 0);
+});
+
+test("workflow routes validate malformed requests and map persistence failures to safe responses", async (t) => {
   const { createInMemoryTelemetryRepository } = await import("../lib/telemetry/repository.ts");
   const { createInMemoryRiskRepository } = await import("../lib/risk/repository.ts");
   const { createInMemoryMaintenanceRepository } = await import("../lib/maintenance/repository.ts");
@@ -226,6 +312,7 @@ test("workflow routes validate malformed requests and report unavailable persist
   const { POST: postTelemetry } = await import("../app/api/telemetry/route.ts");
   const { GET: getRisks } = await import("../app/api/risks/route.ts");
   const { POST: postMaintenance } = await import("../app/api/maintenance/route.ts");
+  const { PATCH: patchMaintenance } = await import("../app/api/maintenance/[id]/route.ts");
 
   setWorkflowDependenciesForTests({
     siteId: "site-01",
@@ -261,7 +348,51 @@ test("workflow routes validate malformed requests and report unavailable persist
   }));
   assert.equal(maintenanceUnknownAssetResponse.status, 400);
 
+  const missingActionResponse = await patchMaintenance(
+    jsonRequest("http://localhost/api/maintenance/missing-action", {
+      status: "COMPLETED",
+      inspectionNote: "No action exists for this id.",
+      actionTaken: "None.",
+      partsReplaced: [],
+      canReturnToService: false,
+      actualOverheat: null,
+    }, "PATCH"),
+    { params: Promise.resolve({ id: "missing-action" }) },
+  );
+  assert.equal(missingActionResponse.status, 404);
+
   setWorkflowDependenciesForTests(null);
   const unavailableResponse = await getRisks(new Request("http://localhost/api/risks?siteId=site-01&status=open"));
   assert.equal(unavailableResponse.status, 503);
+  assert.deepEqual(await unavailableResponse.json(), { error: "Persistence temporarily unavailable." });
+
+  setWorkflowDependenciesForTests({
+    siteId: "site-01",
+    assetIds: ["FL-01", "FL-02", "FL-03", "FL-04", "FL-05"],
+    telemetryRepository: {
+      async insertSnapshot() {
+        throw new Error("db password leaked");
+      },
+      async insertAggregate() {},
+      async listRecent() {
+        return [];
+      },
+    },
+    riskRepository: createInMemoryRiskRepository({ siteId: "site-01" }),
+    maintenanceRepository: createInMemoryMaintenanceRepository({
+      now: () => "2026-08-14T00:00:00.000Z",
+    }),
+    now: () => "2026-08-14T00:00:01.000Z",
+  });
+
+  const hiddenFailureResponse = await postTelemetry(jsonRequest("http://localhost/api/telemetry", {
+    records: [
+      makeTelemetryRecord({
+        observedAt: "2026-08-14T00:00:00.000Z",
+        payloadHash: "hidden-failure-001",
+      }),
+    ],
+  }));
+  assert.equal(hiddenFailureResponse.status, 503);
+  assert.deepEqual(await hiddenFailureResponse.json(), { error: "Persistence temporarily unavailable." });
 });
