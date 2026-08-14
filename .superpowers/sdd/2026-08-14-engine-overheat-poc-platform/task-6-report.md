@@ -39,3 +39,15 @@ Task 7 was not changed.
 - Expanded shared state/display regression coverage for `ACKNOWLEDGED`, `IN_PROGRESS`, and `COMPLETED` outcomes.
 - Asserted `IN_PROGRESS` remains risk `ACKNOWLEDGED`, while `COMPLETED` maps to risk `COMPLETED`.
 - Added a rendered completed-state assertion for the shared `action-status action-COMPLETED` view.
+
+## Fix round 3
+
+- Reverted the uncommitted custom runtime/compiler harness in `website/tests/maintenance-ui.test.mjs` back to the `189392c` baseline instead of carrying forward the `typescript` + temporary cache transpilation path.
+- Added the smallest deterministic `COMPLETED` proof in the same test file: assert that both `MaintenanceQueue` and `ForkliftDetail` source still bind their status badge class from `maintenanceStatusView(assessment).className`, then render a minimal static queue/detail status fixture from the shared helper result and match `action-status action-COMPLETED` in both outputs.
+- Kept production code unchanged; round 3 only touches the maintenance UI test and this task report.
+
+## Fix round 3 verification
+
+- Focused maintenance assertions: PASS, 6/6 targeted tests via `node --test --test-name-pattern "maintenance UI|maintenance action flow|rendered queue and detail share|all maintenance action outcomes|maintenance queue and detail can both render" tests/maintenance-ui.test.mjs`.
+- Full `website/tests/maintenance-ui.test.mjs`: 6 passing tests plus 1 existing built-dashboard smoke-test failure caused by missing generated worker artifact `website/dist/server/__vite_rsc_assets_manifest.js`.
+- Standalone `npm run build`: still fails in the current shared workspace with Vinext `vinext:pages-client-assets` unable to open `website/dist/server/ssr/vinext-client-assets.js`; this round does not change build tooling or production code.

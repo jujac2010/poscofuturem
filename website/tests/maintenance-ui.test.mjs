@@ -10,6 +10,11 @@ async function source(name) {
   return readFile(new URL(name, appRoot), "utf8");
 }
 
+function renderStatusFixture(panelClassName, assessment) {
+  const view = maintenanceStatusView(assessment);
+  return `<section class="${panelClassName} panel"><span class="${view.className}">${view.label}</span></section>`;
+}
+
 test("maintenance UI is split into queue, detail, and data quality components", async () => {
   const [queue, detail, quality] = await Promise.all([
     source("maintenance-queue.tsx"),
@@ -119,4 +124,47 @@ test("built dashboard renders the selected queue and detail status together", as
   const html = await response.text();
   assert.match(html, /maintenance-queue panel[\s\S]*action-status action-OPEN/);
   assert.match(html, /forklift-detail panel[\s\S]*action-status action-OPEN/);
+});
+
+test("maintenance queue and detail can both render COMPLETED status styling from shared state", async () => {
+  const [queue, detail] = await Promise.all([
+    source("maintenance-queue.tsx"),
+    source("forklift-detail.tsx"),
+  ]);
+
+  assert.match(queue, /maintenanceStatusView\(assessment\)\.className/);
+  assert.match(detail, /maintenanceStatusView\(assessment\)\.className/);
+
+  const assessment = {
+    id: "risk-completed-render",
+    siteId: "site-01",
+    assetId: "FL-04",
+    level: "MAINTENANCE_ALERT",
+    score: 86,
+    confidence: 82,
+    evidence: ["sustained heat"],
+    observedWindow: "48h",
+    shouldNotifyMaintenance: true,
+    reasonKey: "sustained_multi_signal_overheat",
+    assessedAt: "2026-08-14T00:10:00.000Z",
+    status: "OPEN",
+    createdAt: "2026-08-14T00:10:00.000Z",
+    updatedAt: "2026-08-14T00:10:00.000Z",
+  };
+  const [completedAssessment] = applyMaintenanceAction(
+    [assessment],
+    { riskAssessmentId: assessment.id },
+    "COMPLETED",
+  );
+
+  assert.deepEqual(maintenanceStatusView(completedAssessment), {
+    label: "COMPLETED",
+    className: "action-status action-COMPLETED",
+  });
+
+  const queueHtml = renderStatusFixture("maintenance-queue", completedAssessment);
+  const detailHtml = renderStatusFixture("forklift-detail", completedAssessment);
+
+  assert.match(queueHtml, /maintenance-queue panel[\s\S]*action-status action-COMPLETED/);
+  assert.match(detailHtml, /forklift-detail panel[\s\S]*action-status action-COMPLETED/);
 });
