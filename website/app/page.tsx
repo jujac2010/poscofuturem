@@ -34,6 +34,15 @@ type Forklift = {
   route: string;
 };
 
+type MaintenanceHistoryEntry = {
+  id: string;
+  assetId: string;
+  status: MaintenanceAction["status"] | "RETURNED_TO_SERVICE";
+  assignee: string;
+  note: string;
+  time: string;
+};
+
 const initialForklifts: Forklift[] = [
   { id: "P-01호", zone: "원료 야드", task: "원료 이송", status: "정상", battery: 86, temperature: 48, coolantTemperature: 72, engineOilTemperature: 68, vibration: 1.8, hours: "4,218 h", risk: "낮음", x: 20, y: 29, route: "원료 야드 → 저장동" },
   { id: "P-02호", zone: "저장동", task: "양극재 적재", status: "정상", battery: 72, temperature: 52, coolantTemperature: 75, engineOilTemperature: 70, vibration: 2.1, hours: "3,806 h", risk: "낮음", x: 53, y: 25, route: "저장동 내부 순환" },
@@ -111,6 +120,9 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState("P-03호");
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(maintenanceAssessment.id);
   const [maintenanceAssessments, setMaintenanceAssessments] = useState<MaintenanceUiAssessment[]>([maintenanceAssessment]);
+  const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceHistoryEntry[]>([
+    { id: "history-001", assetId: "FL-04", status: "ACKNOWLEDGED", assignee: "현장 정비팀", note: "과열 위험 관찰 구간 점검 접수", time: "09:42:31" },
+  ]);
   const [paused, setPaused] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [lastEvent, setLastEvent] = useState<string | null>(null);
@@ -311,6 +323,18 @@ export default function Home() {
     // Keep the selected alert mounted after the API confirms the action.
     setMaintenanceAssessments((current) => applyMaintenanceAction(current, input, status));
     setSelectedAlertId(input.riskAssessmentId);
+    setMaintenanceHistory((current) => [{ id: `${input.riskAssessmentId}-${Date.now()}`, assetId: input.assetId, status, assignee: input.assignee, note: input.note, time: new Date().toLocaleTimeString("ko-KR", { hour12: false }) }, ...current].slice(0, 8));
+    if (input.assetId === "FL-04") {
+      setForklifts((current) => current.map((forklift) => forklift.id === "P-04호"
+        ? { ...forklift, status: status === "COMPLETED" ? "주의" : "점검", task: status === "COMPLETED" ? "재운행 승인 대기" : "정비 점검 진행" }
+        : forklift));
+    }
+  }
+
+  function approveReturnToService() {
+    setMaintenanceHistory((current) => [{ id: `return-${Date.now()}`, assetId: "FL-04", status: "RETURNED_TO_SERVICE", assignee: "현장 정비팀", note: "시험 운행 완료 · 재운행 승인", time: new Date().toLocaleTimeString("ko-KR", { hour12: false }) }, ...current].slice(0, 8));
+    setForklifts((current) => current.map((forklift) => forklift.id === "P-04호" ? { ...forklift, status: "주의", task: "저속 운행" } : forklift));
+    setLiveEvents((current) => [{ time: new Date().toLocaleTimeString("ko-KR", { hour12: false }), label: "P-04호", text: "정비 완료 · 저속 재운행 승인", tone: "warning" }, ...current].slice(0, 8));
   }
 
   return (
@@ -343,6 +367,7 @@ export default function Home() {
       <section className="diagnostic-live-card panel"><div className="panel-header"><div><span className="section-kicker">LIVE DIAGNOSTICS</span><h2>실시간 상세 진단 리포트 · {selected.id}</h2></div><span className={`status-badge report-level-${diagnostic.level}`}>{diagnostic.level} · {diagnostic.score}점</span></div><div className="diagnostic-summary"><div><b>{diagnostic.summary}</b><span>ECU 4개 입력값을 학습 프로필과 비교한 현재 판정</span></div><div className="diagnostic-meta"><span>신뢰도 {diagnostic.confidence}%</span><span>우선순위 {diagnostic.priority}</span><span>{new Date(diagnostic.evaluatedAt).toLocaleTimeString("ko-KR", { hour12: false })} 갱신</span></div></div><div className="diagnostic-columns"><div className="diagnostic-findings"><h3>감지된 이상 징후</h3>{diagnostic.findings.map((finding) => <div className="finding-row" key={finding}><i className={`finding-dot report-level-${diagnostic.level}`} />{finding}</div>)}</div><div className="diagnostic-recommendation"><h3>정비 권고</h3><p>{diagnostic.recommendation}</p><small>판정 기준: 더미 학습 프로필 기반 시연용 평가 · 실제 ECU 연결 시 동일 로직 재사용</small></div></div></section>
 
       <section className="maintenance-operations" aria-label="과열 정비 운영"><MaintenanceQueue assessments={maintenanceAssessments} selectedId={selectedAlertId} onSelect={(id) => setSelectedAlertId(id)} /><ForkliftDetail snapshot={maintenanceSnapshot} assessment={selectedAssessment} onSubmitAction={recordMaintenanceAction} /><DataQualityPanel health={maintenanceHealth} issues={[]} /></section>
+      <MaintenanceHistoryPanel history={maintenanceHistory} onApproveReturn={approveReturnToService} />
 
       <section className="bottom-grid"><div className="fleet-card panel"><div className="panel-header"><div><span className="section-kicker">FLEET OVERVIEW</span><h2>전체 지게차 현황</h2></div><span className="panel-meta">5대 운용 중</span></div><div className="fleet-list">{forklifts.map((forklift) => <button key={forklift.id} className={`fleet-row ${selected.id === forklift.id ? "selected" : ""}`} onClick={() => setSelectedId(forklift.id)}><span className={`mini-vehicle status-${forklift.status}`}>▰</span><span className="fleet-id">{forklift.id}<small>{forklift.zone}</small></span><span className={`fleet-status status-${forklift.status}`}>{forklift.status}</span><span className="fleet-battery"><span className="battery-track"><i style={{ width: `${forklift.battery}%` }} /></span>{Math.round(forklift.battery)}%</span><span className="fleet-temp">{Math.round(forklift.temperature)}°C</span><span className="row-arrow">›</span></button>)}</div></div><div className="event-card panel"><div className="panel-header"><div><span className="section-kicker">EVENT LOG</span><h2>이벤트 로그</h2></div><span className="panel-meta"><span className="live-dot" /> LIVE</span></div><div className="event-list">{liveEvents.map((event, index) => <div className={`event-row ${event.tone === "critical" ? "event-critical" : ""}`} key={`${event.time}-${event.label}-${index}`}><span className="event-time">{event.time}</span><span className={`event-dot ${event.tone}`} /><span><b>{event.label}</b> {event.text}</span></div>)}</div></div></section>
 
@@ -353,6 +378,15 @@ export default function Home() {
       {showFleetReport && <FleetReportModal report={fleetAiReport} recordSummary={recordAiSummary} onClose={() => setShowFleetReport(false)} />}
     </main>
   );
+}
+
+function MaintenanceHistoryPanel({ history, onApproveReturn }: { history: MaintenanceHistoryEntry[]; onApproveReturn: () => void }) {
+  const hasCompleted = history.some((entry) => entry.status === "COMPLETED");
+  return <section className="maintenance-history panel" aria-label="정비 이력 및 재운행 관리">
+    <div className="panel-header"><div><span className="section-kicker">MAINTENANCE HISTORY</span><h2>정비 이력 및 재운행 관리</h2></div><span className="panel-meta">{history.length}건 기록</span></div>
+    <div className="maintenance-command-bar"><div><strong>운행 제한 기준</strong><span>점검 상태는 운행 금지, 주의 상태는 저속 운행으로 관리합니다.</span></div>{hasCompleted && <button type="button" className="return-service-button" onClick={onApproveReturn}>재운행 승인</button>}</div>
+    <div className="history-table-wrap"><table className="history-table"><thead><tr><th>시각</th><th>장비</th><th>상태</th><th>담당자</th><th>조치 내용</th></tr></thead><tbody>{history.map((entry) => <tr key={entry.id}><td>{entry.time}</td><td><strong>{entry.assetId}</strong></td><td><span className={`action-status action-${entry.status}`}>{entry.status === "RETURNED_TO_SERVICE" ? "재운행 승인" : entry.status}</span></td><td>{entry.assignee}</td><td>{entry.note}</td></tr>)}</tbody></table></div>
+  </section>;
 }
 
 function Metric({ label, value, sub, tone }: { label: string; value: string; sub: string; tone: string }) { return <div className="metric"><span>{label}</span><strong className={tone}>{value}</strong><small>{sub}</small></div>; }
