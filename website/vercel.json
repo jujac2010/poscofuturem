@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npm run build:vercel",
+  "installCommand": "npm install --include=optional",
+  "env": {
+    "NITRO_PRESET": "vercel"
+  },
+  "outputDirectory": ".vercel/output",
+  "framework": null
+}

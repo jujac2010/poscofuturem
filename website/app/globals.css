@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import "tailwindcss/index.css";
 @import "./twin-scene.css";
 @import "./realistic-forklift.css";
 @import "./real-site-background.css";
